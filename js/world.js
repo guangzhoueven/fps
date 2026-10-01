@@ -7,6 +7,7 @@
 let wallColliders = [];
 let wallMeshes = [];
 let solidSlabs = [];
+let roofSlabs = [];
 let doors = [];
 let pickups = [];
 let platforms = []; // {box: Box3, top: number} — player can stand on top
@@ -30,6 +31,7 @@ function buildScene(){
   // Initialize object pools
   particlePool=[]; tracerPool=[]; projectilePool=[];
   solidSlabs = [ new THREE.Box3(new THREE.Vector3(-60,-1,-60), new THREE.Vector3(60,0,60)) ];
+  roofSlabs = [];
   // Create 200 particle meshes (tiny spheres)
   const particleGeo = new THREE.SphereGeometry(0.08,4,4);
   const particleMat = new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1});
@@ -70,10 +72,13 @@ function buildScene(){
     const roof = new THREE.Mesh(new THREE.PlaneGeometry(rm.w + 0.6, rm.d + 0.6), new THREE.MeshStandardMaterial({color:0x5a4030, roughness:0.85, side: THREE.DoubleSide}));
     roof.rotation.x = -Math.PI/2; roof.position.set(rm.x, 3.05, rm.z);
     scene.add(roof);
-    solidSlabs.push(new THREE.Box3(
+    const roofBox = new THREE.Box3(
       new THREE.Vector3(rm.x-(rm.w+0.6)/2, 2.98, rm.z-(rm.d+0.6)/2),
       new THREE.Vector3(rm.x+(rm.w+0.6)/2, 3.08, rm.z+(rm.d+0.6)/2)
-    ));
+    );
+    solidSlabs.push(roofBox);
+    roofSlabs.push(roofBox);
+    platforms.push({box: roofBox, top: 3.05, stepUp: 0.8});
   }
 
   // Each room is standalone. Each room gets ONE door on the wall facing nearest other room,
@@ -143,7 +148,8 @@ function buildScene(){
       const cb = new THREE.Box3(cMin,cMax);
       const collider = cb.clone();
       wallColliders.push(collider);
-      doors.push({id:doorIdCounter++, group, mesh:dm, isOpen:false, openAngle:0, targetAngle:Math.PI/2, axis, pos:{x:posX,z:posZ}, collisionBox:cb, colliderRef:collider});
+      wallMeshes.push(dm); // bullet + LOS raycast target (swings aside when open)
+      doors.push({id:doorIdCounter++, group, mesh:dm, isOpen:false, openAngle:0, targetAngle:0, axis, pos:{x:posX,z:posZ}, collisionBox:cb, colliderRef:collider});
     };
     if(hasDoorN) makeDoor('z','north');
     if(hasDoorS) makeDoor('z','south');
@@ -297,16 +303,19 @@ function buildScene(){
       // Second floor: solid floor except stair hole (east strip: bx+1 to bx+3, full Z depth)
       // Left part (west, x: bx-hw to bx+1) — covers most of the room
       const lfW = (bx + 1) - (bx - hw);
-      const lf = new THREE.Mesh(new THREE.PlaneGeometry(lfW, bd), new THREE.MeshStandardMaterial({map:floorTex(),color:0xffffff,roughness:.92}));
-      lf.rotation.x = -Math.PI/2; lf.position.set(bx - hw + lfW/2, floorY, bz); scene.add(lf);
+      const flT = 0.16;
+      const lf = new THREE.Mesh(new THREE.BoxGeometry(lfW, flT, bd), new THREE.MeshStandardMaterial({map:floorTex(),color:0xffffff,roughness:.92}));
+      lf.position.set(bx - hw + lfW/2, floorY - flT/2, bz); scene.add(lf);
       // Register as platform so player can stand on it
-      platforms.push({box: new THREE.Box3(new THREE.Vector3(bx-hw, 0, bz-hd), new THREE.Vector3(bx+1, floorY+0.1, bz+hd)), top: floorY});
+      platforms.push({box: new THREE.Box3(new THREE.Vector3(bx-hw, 0, bz-hd), new THREE.Vector3(bx+1, floorY+0.1, bz+hd)), top: floorY, stepUp: 2.0});
+      roofSlabs.push(new THREE.Box3(new THREE.Vector3(bx-hw, floorY-0.05, bz-hd), new THREE.Vector3(bx+1, floorY+0.05, bz+hd)));
       // Right part (east, x: bx+3 to bx+hw) — small strip east of stair hole
       const rfW = (bx + hw) - (bx + 3);
       if(rfW > 0.1){
-        const rf = new THREE.Mesh(new THREE.PlaneGeometry(rfW, bd), new THREE.MeshStandardMaterial({map:floorTex(),color:0xffffff,roughness:.92}));
-        rf.rotation.x = -Math.PI/2; rf.position.set(bx + 3 + rfW/2, floorY, bz); scene.add(rf);
-        platforms.push({box: new THREE.Box3(new THREE.Vector3(bx+3, 0, bz-hd), new THREE.Vector3(bx+hw, floorY+0.1, bz+hd)), top: floorY});
+        const rf = new THREE.Mesh(new THREE.BoxGeometry(rfW, flT, bd), new THREE.MeshStandardMaterial({map:floorTex(),color:0xffffff,roughness:.92}));
+        rf.position.set(bx + 3 + rfW/2, floorY - flT/2, bz); scene.add(rf);
+        platforms.push({box: new THREE.Box3(new THREE.Vector3(bx+3, 0, bz-hd), new THREE.Vector3(bx+hw, floorY+0.1, bz+hd)), top: floorY, stepUp: 2.0});
+        roofSlabs.push(new THREE.Box3(new THREE.Vector3(bx+3, floorY-0.05, bz-hd), new THREE.Vector3(bx+hw, floorY+0.05, bz+hd)));
       }
       // Hole between bx+1 and bx+3 is the stair opening — no floor, no platform
     } else {
@@ -326,8 +335,9 @@ function buildScene(){
       ceilMesh.rotation.x = Math.PI/2; ceilMesh.position.set(bx, ceilY, bz); scene.add(ceilMesh);
       const roofMesh = new THREE.Mesh(new THREE.PlaneGeometry(bw+0.6, bd+0.6), new THREE.MeshStandardMaterial({color:0x5a4030, roughness:0.85, side: THREE.DoubleSide}));
       roofMesh.rotation.x = -Math.PI/2; roofMesh.position.set(bx, ceilY+0.05, bz); scene.add(roofMesh);
-      // Register roof as platform
-      platforms.push({box: new THREE.Box3(new THREE.Vector3(bx-bw/2-0.3, 0, bz-bd/2-0.3), new THREE.Vector3(bx+bw/2+0.3, ceilY+0.1, bz+bd/2+0.3)), top: ceilY+0.05});
+      // Register roof as platform (stepUp: jump under the ceiling to climb on top)
+      platforms.push({box: new THREE.Box3(new THREE.Vector3(bx-bw/2-0.3, 0, bz-bd/2-0.3), new THREE.Vector3(bx+bw/2+0.3, ceilY+0.1, bz+bd/2+0.3)), top: ceilY+0.05, stepUp: 0.8});
+      roofSlabs.push(new THREE.Box3(new THREE.Vector3(bx-bw/2-0.3, ceilY-0.07, bz-bd/2-0.3), new THREE.Vector3(bx+bw/2+0.3, ceilY+0.12, bz+bd/2+0.3)));
     }
     // Light — only one per floor, skip for first floor of two-story to reduce light count
     if(floorY > 1.0){
@@ -357,6 +367,7 @@ function buildScene(){
     const dcb = new THREE.Box3(dMin, dMax);
     const dcol = dcb.clone();
     wallColliders.push(dcol);
+    wallMeshes.push(dm); // bullet + LOS raycast target (swings aside when open)
     const door = {id:doorIdCounter++, group:dg, mesh:dm, isOpen:Math.random()<0.4, openAngle:0, targetAngle:0, axis:daxis, pos:{x:dpx,z:dpz}, collisionBox:dcb, colliderRef:dcol};
     door.targetAngle = door.isOpen ? Math.PI/2 : 0;
     door.openAngle = door.targetAngle;

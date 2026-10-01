@@ -15,6 +15,13 @@ const _pfwd = new THREE.Vector3(), _prgt = new THREE.Vector3(), _pmove = new THR
 const _pnew = new THREE.Vector3(), _ptmp = new THREE.Vector3();
 const _pbb = new THREE.Box3(), _pbb2 = new THREE.Box3();
 const _psize = new THREE.Vector3();
+function playerHits(bb, checkCeiling){
+  for(let i=0;i<wallColliders.length;i++){ const c = wallColliders[i]; if(c && bb.intersectsBox(c)) return true; }
+  if(checkCeiling){
+    for(let i=0;i<roofSlabs.length;i++){ const s = roofSlabs[i]; if(s && bb.intersectsBox(s)) return true; }
+  }
+  return false;
+}
 function updatePlayer(dt){
   if(state.gameOver) return;
   dt = Math.min(dt, 0.033);
@@ -37,8 +44,17 @@ function updatePlayer(dt){
   playerVel.x = _pmove.x * baseSpeed; playerVel.z = _pmove.z * baseSpeed;
   playerVel.y += GRAVITY * dt;
   if(onGround && keys['Space']){ playerVel.y = JUMP; onGround = false; }
+  const pSize = crouching?0.2:0.25, pHeight = crouching?1.2:1.6;
+  _psize.set(pSize*2, pHeight, pSize*2);
   const newPos = _pnew.copy(camera.position);
   newPos.x += playerVel.x * dt; newPos.z += playerVel.z * dt; newPos.y += playerVel.y * dt;
+  if(playerVel.y > 0){
+    _pbb.setFromCenterAndSize(newPos, _psize);
+    for(let i=0;i<roofSlabs.length;i++){
+      const s = roofSlabs[i];
+      if(s && _pbb.intersectsBox(s)){ playerVel.y = 0; newPos.y = camera.position.y; break; }
+    }
+  }
 
   // Platform standing — check if player is above a platform (rock/container/wall/roof)
   let platformTop = 0;
@@ -47,8 +63,8 @@ function updatePlayer(dt){
       if(newPos.x >= p.box.min.x - 0.2 && newPos.x <= p.box.max.x + 0.2 &&
          newPos.z >= p.box.min.z - 0.2 && newPos.z <= p.box.max.z + 0.2){
         const topY = p.top + eyeHeight;
-        // Player lands on platform if feet are at or below top, and above the platform's bottom
-        if(newPos.y <= topY + 0.15 && newPos.y >= p.top - 1.0){
+        // Player lands on platform if feet are at or below top, and within step-up reach above the platform
+        if(newPos.y <= topY + 0.15 && newPos.y - eyeHeight >= p.top - (p.stepUp || 2.6)){
           platformTop = Math.max(platformTop, topY);
         }
       }
@@ -59,19 +75,18 @@ function updatePlayer(dt){
   if(newPos.y < groundY){ newPos.y = groundY; playerVel.y = 0; onGround = true; }
   else if(platformTop === 0 && newPos.y < eyeHeight){ newPos.y = eyeHeight; playerVel.y = 0; onGround = true; }
 
-  const pSize = crouching?0.2:0.25, pHeight = crouching?1.2:1.6;
-  _psize.set(pSize*2, pHeight, pSize*2);
+  const rising = playerVel.y > 0;
   _pbb.setFromCenterAndSize(newPos, _psize);
-  if(wallColliders.some(c=>c && _pbb.intersectsBox(c))){
+  if(playerHits(_pbb, rising)){
     // Try X axis only
     _ptmp.set(camera.position.x+playerVel.x*dt, newPos.y, camera.position.z);
     _pbb2.setFromCenterAndSize(_ptmp, _psize);
-    if(!wallColliders.some(c=>c && _pbb2.intersectsBox(c))){ camera.position.x = _ptmp.x; camera.position.y = newPos.y; }
+    if(!playerHits(_pbb2, rising)){ camera.position.x = _ptmp.x; camera.position.y = newPos.y; }
     // Try Z axis only
     else {
       _ptmp.set(camera.position.x, newPos.y, camera.position.z+playerVel.z*dt);
       _pbb2.setFromCenterAndSize(_ptmp, _psize);
-      if(!wallColliders.some(c=>c && _pbb2.intersectsBox(c))){ camera.position.z = _ptmp.z; camera.position.y = newPos.y; }
+      if(!playerHits(_pbb2, rising)){ camera.position.z = _ptmp.z; camera.position.y = newPos.y; }
     }
   } else { camera.position.copy(newPos); }
   camera.rotation.y = yaw; camera.rotation.x = pitch;
