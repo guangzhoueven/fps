@@ -6,6 +6,7 @@
 // ============================================================================
 let wallColliders = [];
 let wallMeshes = [];
+let solidSlabs = [];
 let doors = [];
 let pickups = [];
 let platforms = []; // {box: Box3, top: number} — player can stand on top
@@ -28,6 +29,7 @@ let doorIdCounter = 0;
 function buildScene(){
   // Initialize object pools
   particlePool=[]; tracerPool=[]; projectilePool=[];
+  solidSlabs = [ new THREE.Box3(new THREE.Vector3(-60,-1,-60), new THREE.Vector3(60,0,60)) ];
   // Create 200 particle meshes (tiny spheres)
   const particleGeo = new THREE.SphereGeometry(0.08,4,4);
   const particleMat = new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1});
@@ -68,6 +70,10 @@ function buildScene(){
     const roof = new THREE.Mesh(new THREE.PlaneGeometry(rm.w + 0.6, rm.d + 0.6), new THREE.MeshStandardMaterial({color:0x5a4030, roughness:0.85, side: THREE.DoubleSide}));
     roof.rotation.x = -Math.PI/2; roof.position.set(rm.x, 3.05, rm.z);
     scene.add(roof);
+    solidSlabs.push(new THREE.Box3(
+      new THREE.Vector3(rm.x-(rm.w+0.6)/2, 2.98, rm.z-(rm.d+0.6)/2),
+      new THREE.Vector3(rm.x+(rm.w+0.6)/2, 3.08, rm.z+(rm.d+0.6)/2)
+    ));
   }
 
   // Each room is standalone. Each room gets ONE door on the wall facing nearest other room,
@@ -482,6 +488,15 @@ function buildScene(){
       wallColliders.push(new THREE.Box3().setFromObject(c1));
       wallMeshes.push(c1);
     }
+  }
+
+  for(const p of platforms){
+    const b = p.box;
+    if(!b) continue;
+    solidSlabs.push(new THREE.Box3(
+      new THREE.Vector3(b.min.x, p.top - 0.02, b.min.z),
+      new THREE.Vector3(b.max.x, p.top + 0.02, b.max.z)
+    ));
   }
 
   // Pre-place pickups

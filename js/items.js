@@ -45,6 +45,8 @@ function throwGrenade(){
 }
 function detonateGrenade(g){
   g.detonated = true; scene.remove(g.mesh);
+  if(g.trail){ scene.remove(g.trail); g.trail.geometry.dispose(); g.trail.material.dispose(); g.trail = null; }
+  if(g.ring){ if(g.ring.geometry) g.ring.geometry.dispose(); if(g.ring.material) g.ring.material.dispose(); g.ring = null; }
   const idx = grenades.indexOf(g); if(idx>=0) grenades.splice(idx,1);
   // Bolt impact: deal damage at impact point
   if(g.isBolt){
@@ -146,6 +148,60 @@ function updatePowerups(dt){
 let grenades = [];
 const grenadeArcLine = null;
 
+const _swAxes = ['x','y','z'];
+const _swOut = {hit:false, t:1, point:new THREE.Vector3(), contact:new THREE.Vector3(), normal:new THREE.Vector3()};
+const _gPrev = new THREE.Vector3(), _gNext = new THREE.Vector3();
+const _prjPrev = new THREE.Vector3(), _prjNext = new THREE.Vector3();
+
+function segBoxEntryT(box, a, b, pad){
+  let tmin = 0, tmax = 1;
+  for(let i=0;i<3;i++){
+    const ax = _swAxes[i];
+    const lo = box.min[ax] - pad, hi = box.max[ax] + pad;
+    const d = b[ax] - a[ax], p = a[ax];
+    if(d > -1e-9 && d < 1e-9){ if(p < lo || p > hi) return -1; continue; }
+    let t1 = (lo - p)/d, t2 = (hi - p)/d;
+    if(t1 > t2){ const s = t1; t1 = t2; t2 = s; }
+    if(t1 > tmin) tmin = t1;
+    if(t2 < tmax) tmax = t2;
+    if(tmin > tmax) return -1;
+  }
+  return tmin;
+}
+
+// Returns the first surface hit along from->to (pad = projectile radius).
+// _swOut is reused across calls — read it immediately, never keep a reference.
+function sweepProjectiles(from, to, pad){
+  const out = _swOut; out.hit = false; out.t = 1;
+  let bestT = Infinity, bestBox = null;
+  for(let i=0;i<wallColliders.length;i++){
+    const c = wallColliders[i]; if(!c) continue;
+    const t = segBoxEntryT(c, from, to, pad);
+    if(t >= 0 && t < bestT){ bestT = t; bestBox = c; }
+  }
+  for(let i=0;i<solidSlabs.length;i++){
+    const c = solidSlabs[i]; if(!c) continue;
+    const t = segBoxEntryT(c, from, to, pad);
+    if(t >= 0 && t < bestT){ bestT = t; bestBox = c; }
+  }
+  if(!bestBox) return out;
+  out.hit = true; out.t = bestT;
+  out.point.copy(from).lerp(to, bestT);
+  let bestD = Infinity, axis = 1, sign = 1;
+  for(let i=0;i<3;i++){
+    const lo = bestBox.min[_swAxes[i]] - pad, hi = bestBox.max[_swAxes[i]] + pad;
+    const v = out.point.getComponent(i);
+    const dLo = v - lo, dHi = hi - v;
+    if(dLo < bestD){ bestD = dLo; axis = i; sign = -1; }
+    if(dHi < bestD){ bestD = dHi; axis = i; sign = 1; }
+  }
+  out.normal.set(0,0,0); out.normal.setComponent(axis, sign);
+  const face = (sign > 0 ? bestBox.max[_swAxes[axis]] + pad : bestBox.min[_swAxes[axis]] - pad) + sign*0.02;
+  out.point.setComponent(axis, face);
+  out.contact.copy(out.point).addScaledVector(out.normal, -pad);
+  return out;
+}
+
 function spawnEnemyProjectile(from, target, damage){
   const dir = target.clone().sub(from).normalize();
   const mesh = acquirePooledMesh(projectilePool, _projectileGeoShared, 0x44ddff);
@@ -156,9 +212,22 @@ function updateGrenades(dt){
   for(let i=grenades.length-1; i>=0; i--){
     const g = grenades[i];
     if(g.detonated){ if(g.trail){ scene.remove(g.trail); g.trail.geometry.dispose(); if(g.ring)g.ring.geometry?.dispose(); } continue; }
-    g._pos = g.mesh.position.clone();
+    _gPrev.copy(g.mesh.position);
     g.vel.y -= (g.isRocket ? 2 : 9.8) * dt;
-    g.mesh.position.x += g.vel.x * dt; g.mesh.position.y += g.vel.y * dt; g.mesh.position.z += g.vel.z * dt;
+    _gNext.copy(_gPrev).addScaledVector(g.vel, dt);
+    const hit = sweepProjectiles(_gPrev, _gNext, g.isRocket ? 0.15 : 0.22);
+    if(hit.hit){
+      g.mesh.position.copy(g.isRocket ? hit.contact : hit.point);
+      g._pos.copy(g.mesh.position);
+      if(g.isRocket){ detonateGrenade(g); continue; }
+      const vn = g.vel.dot(hit.normal);
+      if(vn < -0.5) g.vel.addScaledVector(hit.normal, -1.4 * vn);
+      else if(vn < 0) g.vel.addScaledVector(hit.normal, -vn);
+      g.vel.multiplyScalar(1 - Math.min(1, dt * 6));
+    } else {
+      g.mesh.position.copy(_gNext);
+    }
+    g._pos.copy(g.mesh.position);
     g.mesh.rotation.x += dt*5; g.mesh.rotation.y += dt*3;
     // Pulse ring
     if(g.ring){ const s = 0.8 + Math.sin(clock.elapsedTime*10)*0.3; g.ring.scale.setScalar(s); }
@@ -179,26 +248,21 @@ function updateGrenades(dt){
     }
     g.life -= dt;
     if(!g.isRocket && g.mesh.position.y < 0.15){ g.mesh.position.y = 0.15; g.vel.y *= -0.4; g.vel.x *= 0.7; g.vel.z *= 0.7; }
-    if(g.isRocket){
-      _rocketBox.setFromCenterAndSize(g.mesh.position, _rocketSize);
-      if(wallColliders.some(c=>c && _rocketBox.intersectsBox(c))){ detonateGrenade(g); continue; }
-    }
     if(g.life <= 0) detonateGrenade(g);
   }
 }
-const _prjBox = new THREE.Box3();
-const _prjSize = new THREE.Vector3(0.1,0.1,0.1);
-const _rocketBox = new THREE.Box3();
-const _rocketSize = new THREE.Vector3(0.2,0.2,0.2);
 function updateProjectiles(dt){
   for(let i=projectiles.length-1; i>=0; i--){
     const p = projectiles[i];
-    p.mesh.position.addScaledVector(p.vel, dt); p.life -= dt;
+    _prjPrev.copy(p.mesh.position);
+    _prjNext.copy(_prjPrev).addScaledVector(p.vel, dt);
+    p.life -= dt;
+    const hit = sweepProjectiles(_prjPrev, _prjNext, 0.18);
+    p.mesh.position.copy(hit.hit ? hit.contact : _prjNext);
     if(p.mesh.position.distanceTo(camera.position) < 0.5){ takeDamage(p.damage, p.mesh.position);
       if(p.fromPool) p.mesh.visible=false; else scene.remove(p.mesh);
       projectiles.splice(i,1); continue; }
-    _prjBox.setFromCenterAndSize(p.mesh.position, _prjSize);
-    if(wallColliders.some(c=>c && _prjBox.intersectsBox(c)) || p.life <= 0){
+    if(hit.hit || p.life <= 0){
       spawnSpark(p.mesh.position, 0x44ddff, 0.1);
       if(p.fromPool) p.mesh.visible=false; else scene.remove(p.mesh);
       projectiles.splice(i,1); }

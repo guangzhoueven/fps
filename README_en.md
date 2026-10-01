@@ -5,29 +5,29 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/guangzhoueven/guangzhoueven-fps/actions/workflows/release.yml">
-    <img alt="Build & Release" src="https://github.com/guangzhoueven/guangzhoueven-fps/actions/workflows/release.yml/badge.svg" />
+  <a href="https://github.com/guangzhoueven/fps/actions/workflows/release.yml">
+    <img alt="Build & Release" src="https://github.com/guangzhoueven/fps/actions/workflows/release.yml/badge.svg" />
   </a>
   <img alt="Language" src="https://img.shields.io/badge/language-JavaScript-F7DF1E?logo=javascript&logoColor=black" />
   <img alt="Three.js" src="https://img.shields.io/badge/Three.js-r160-black?logo=threedotjs&logoColor=white" />
   <img alt="Electron" src="https://img.shields.io/badge/Electron-33-47848F?logo=electron&logoColor=white" />
 </p>
 <p align="center">
-  <img alt="GitHub stars" src="https://img.shields.io/github/stars/guangzhoueven/guangzhoueven-fps?style=social" />
-  <img alt="GitHub forks" src="https://img.shields.io/github/forks/guangzhoueven/guangzhoueven-fps?style=social" />
-  <img alt="GitHub watchers" src="https://img.shields.io/github/watchers/guangzhoueven/guangzhoueven-fps?style=social" />
+  <img alt="GitHub stars" src="https://img.shields.io/github/stars/guangzhoueven/fps?style=social" />
+  <img alt="GitHub forks" src="https://img.shields.io/github/forks/guangzhoueven/fps?style=social" />
+  <img alt="GitHub watchers" src="https://img.shields.io/github/watchers/guangzhoueven/fps?style=social" />
 </p>
 <p align="center">
-  <a href="https://www.star-history.com/?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&legend=top-left">
+  <a href="https://www.star-history.com/?repos=guangzhoueven%2Ffps&type=date&legend=top-left">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&theme=dark&legend=top-left" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&theme=light&legend=top-left" />
-    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&theme=light&legend=top-left" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Ffps&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Ffps&type=date&theme=light&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=guangzhoueven%2Ffps&type=date&theme=light&legend=top-left" />
   </picture>
   </a>
 </p>
 <p align="center">
-  <a href="http://guangzhoueven.github.io/guangzhoueven-fps"><b>Play now</b></a>
+  <a href="http://guangzhoueven.github.io/fps"><b>Play now</b></a>
 </p>
 
 
@@ -76,8 +76,8 @@ Visit **[fps.gzeven.cc.cd](https://fps.gzeven.cc.cd)** in any modern desktop bro
 ### Run locally
 
 ```bash
-git clone https://github.com/guangzhoueven/guangzhoueven-fps.git
-cd guangzhoueven-fps
+git clone https://github.com/guangzhoueven/fps.git
+cd fps
 
 # Zero build step — serve with any static server, e.g.:
 npx serve .
@@ -100,7 +100,7 @@ npm run dist
 # Outputs dist/NeonSiege-Setup-1.0.0.exe (installer) and NeonSiege-Portable-1.0.0.exe (portable)
 ```
 
-Pushing a `v*` tag automatically triggers GitHub Actions (`windows-latest`) to build and publish the exes to [Releases](https://github.com/guangzhoueven/guangzhoueven-fps/releases).
+Pushing a `v*` tag automatically triggers GitHub Actions (`windows-latest`) to build and publish the exes to [Releases](https://github.com/guangzhoueven/fps/releases).
 
 ## Tech Stack
 
@@ -113,7 +113,7 @@ Pushing a `v*` tag automatically triggers GitHub Actions (`windows-latest`) to b
 ## Project Structure
 
 ```
-guangzhoueven-fps/
+fps/
 ├── index.html              # Entry page
 ├── css/style.css           # Styles
 ├── js/                     # Game modules

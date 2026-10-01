@@ -4,31 +4,31 @@
   <a href="/README_en.md">English</a> | <a href="/README.md">中文</a>
 </p>
 <p align="center">
-  <a href="https://github.com/guangzhoueven/guangzhoueven-fps/actions/workflows/release.yml">
-    <img alt="Build & Release" src="https://github.com/guangzhoueven/guangzhoueven-fps/actions/workflows/release.yml/badge.svg" />
+  <a href="https://github.com/guangzhoueven/fps/actions/workflows/release.yml">
+    <img alt="Build & Release" src="https://github.com/guangzhoueven/fps/actions/workflows/release.yml/badge.svg" />
   </a>
   <img alt="Language" src="https://img.shields.io/badge/language-JavaScript-F7DF1E?logo=javascript&logoColor=black" />
   <img alt="Three.js" src="https://img.shields.io/badge/Three.js-r160-black?logo=threedotjs&logoColor=white" />
   <img alt="Electron" src="https://img.shields.io/badge/Electron-33-47848F?logo=electron&logoColor=white" />
 </p>
 <p align="center">
-  <img alt="GitHub stars" src="https://img.shields.io/github/stars/guangzhoueven/guangzhoueven-fps?style=social" />
-  <img alt="GitHub forks" src="https://img.shields.io/github/forks/guangzhoueven/guangzhoueven-fps?style=social" />
-  <img alt="GitHub watchers" src="https://img.shields.io/github/watchers/guangzhoueven/guangzhoueven-fps?style=social" />
+  <img alt="GitHub stars" src="https://img.shields.io/github/stars/guangzhoueven/fps?style=social" />
+  <img alt="GitHub forks" src="https://img.shields.io/github/forks/guangzhoueven/fps?style=social" />
+  <img alt="GitHub watchers" src="https://img.shields.io/github/watchers/guangzhoueven/fps?style=social" />
 </p>
 
 
 <p align="center">
-  <a href="https://www.star-history.com/?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&legend=top-left">
+  <a href="https://www.star-history.com/?repos=guangzhoueven%2Ffps&type=date&legend=top-left">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&theme=dark&legend=top-left" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&theme=light&legend=top-left" />
-    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=guangzhoueven%2Fguangzhoueven-fps&type=date&theme=light&legend=top-left" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Ffps&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=guangzhoueven%2Ffps&type=date&theme=light&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=guangzhoueven%2Ffps&type=date&theme=light&legend=top-left" />
   </picture>
   </a>
 </p>
 <p align="center">
-  <a href="http://guangzhoueven.github.io/guangzhoueven-fps"><b>立即游玩</b></a>
+  <a href="http://guangzhoueven.github.io/fps"><b>立即游玩</b></a>
 </p>
 
 
@@ -76,8 +76,8 @@
 ### 本地运行
 
 ```bash
-git clone https://github.com/guangzhoueven/guangzhoueven-fps.git
-cd guangzhoueven-fps
+git clone https://github.com/guangzhoueven/fps.git
+cd fps
 
 # 零构建 —— 任意静态服务器即可，例如：
 npx serve .
@@ -100,7 +100,7 @@ npm run dist
 # 输出 dist/NeonSiege-Setup-1.0.0.exe（安装版）与 NeonSiege-Portable-1.0.0.exe（便携版）
 ```
 
-推送 `v*` 标签会自动触发 GitHub Actions（`windows-latest`）构建，并把 exe 发布到 [Releases](https://github.com/guangzhoueven/guangzhoueven-fps/releases)。
+推送 `v*` 标签会自动触发 GitHub Actions（`windows-latest`）构建，并把 exe 发布到 [Releases](https://github.com/guangzhoueven/fps/releases)。
 
 ## 技术栈
 
@@ -113,7 +113,7 @@ npm run dist
 ## 项目结构
 
 ```
-guangzhoueven-fps/
+fps/
 ├── index.html              # 入口页面
 ├── css/style.css           # 样式
 ├── js/                     # 游戏模块
