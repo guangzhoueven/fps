@@ -45,12 +45,21 @@ function startNextWave(){
       sx = radius*Math.cos(angle);
       sz = radius*Math.sin(angle);
     }
+    // Wave-gated roster: each kind keeps its share of the roll at every wave
+    // where it is unlocked (skipped kinds no longer inflate the ones below them)
     let kind='grunt'; const r=Math.random();
-    if(state.wave>=7 && r<0.10) kind='tank';
-    else if(state.wave>=6 && r<0.18) kind='shooter';
-    else if(state.wave>=4 && r<0.3) kind='brute';
-    else if(state.wave>=2 && r<0.45) kind='phantom';
-    else if(state.wave>=3 && r<0.55) kind='runner';
+    const bands = [];
+    if(state.wave>=7) bands.push(['tank',0.10]);
+    if(state.wave>=6) bands.push(['shooter',0.08]);
+    if(state.wave>=4) bands.push(['brute',0.12]);
+    if(state.wave>=2) bands.push(['phantom',0.15]);
+    if(state.wave>=3) bands.push(['runner',0.10]);
+    if(state.wave>=6) bands.push(['bomber',0.07]);   // suicide rusher, chain detonates
+    if(state.wave>=5) bands.push(['healer',0.06]);   // heals the pack, kite it down
+    if(state.wave>=4) bands.push(['splitter',0.09]); // bursts into swarmlings
+    if(state.wave>=3) bands.push(['jumper',0.08]);   // leaps at you in bursts
+    let roll=0;
+    for(const [k,p] of bands){ roll+=p; if(r<roll){ kind=k; break; } }
     spawnQueue.push({ at: clock.elapsedTime + i*0.25, sx, sz, kind });
   }
 }
@@ -96,7 +105,7 @@ function completeWave(){
   const waveDuration = clock.elapsedTime - waveStartTime;
   if(noDamageTimer >= waveDuration) unlockAchievement('untouchable');
   // Check weapons collector achievement
-  const allWeaponIds = ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun'];
+  const allWeaponIds = ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun','tesla','flamer','ricochet'];
   if(allWeaponIds.every(id => ownedWeapons.has(id))) unlockAchievement('collector');
   // Reset wave tracking
   state.waveHeadshots = 0; state.waveBarrelKills = 0; waveStartTime = clock.elapsedTime;

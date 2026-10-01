@@ -12,6 +12,32 @@ const _losDir = new THREE.Vector3();
 const _losTarget = new THREE.Vector3();
 const _losRC = new THREE.Raycaster();
 const _mvBox = new THREE.Box3();
+const _burnOff = new THREE.Vector3();
+
+// Per-kind visuals — kept out of the constructor hot path
+function enemyGeo(kind, s){
+  switch(kind){
+    case 'boss': return new THREE.IcosahedronGeometry(s,1);
+    case 'brute': return new THREE.DodecahedronGeometry(s,0);
+    case 'phantom': return new THREE.IcosahedronGeometry(s,0);
+    case 'tank': return new THREE.IcosahedronGeometry(s,1);
+    case 'bomber': return new THREE.IcosahedronGeometry(s,0);
+    case 'splitter': return new THREE.DodecahedronGeometry(s,1);
+    case 'swarmling': return new THREE.OctahedronGeometry(s,0);
+    case 'jumper': return new THREE.TetrahedronGeometry(s*1.3,0);
+    default: return new THREE.SphereGeometry(s,12,12);
+  }
+}
+const FLAT_SHADE_KINDS = ['brute','boss','tank','bomber','splitter','jumper','swarmling'];
+function enemyEyeColor(kind){
+  if(kind==='boss') return 0xff3333;
+  if(kind==='phantom') return 0x88ccff;
+  if(kind==='tank') return 0x44ff44;
+  if(kind==='healer') return 0x66ffcc;
+  if(kind==='bomber') return 0xffcc33;
+  if(kind==='jumper') return 0xff99dd;
+  return 0xffff44;
+}
 
 class Enemy {
   constructor(x, z, kind, wave){
@@ -34,8 +60,9 @@ class Enemy {
     this.navGrid = footprint <= 0.45 ? navGrids[0] : (footprint <= 0.9 ? navGrids[1] : navGrids[2]);
     this.path = null; this.pathIndex = 0;
     this.repathTimer = 0.3 + Math.random() * 0.4;
-    const geo = kind==='boss' ? new THREE.IcosahedronGeometry(this.def.size,1) : kind==='brute' ? new THREE.DodecahedronGeometry(this.def.size,0) : kind==='phantom' ? new THREE.IcosahedronGeometry(this.def.size,0) : kind==='tank' ? new THREE.IcosahedronGeometry(this.def.size,1) : new THREE.SphereGeometry(this.def.size,12,12);
-    const mat = new THREE.MeshStandardMaterial({color:this.def.color,roughness:.5,emissive:this.def.color,emissiveIntensity:.15,flatShading:kind==='brute'||kind==='boss'||kind==='tank',transparent:kind==='phantom',opacity:kind==='phantom'?0.72:1.0});
+    this._leapT = 0; this._leapCd = 0.6 + Math.random();
+    const geo = enemyGeo(kind, this.def.size);
+    const mat = new THREE.MeshStandardMaterial({color:this.def.color,roughness:.5,emissive:this.def.color,emissiveIntensity:.15,flatShading:FLAT_SHADE_KINDS.includes(kind),transparent:kind==='phantom',opacity:kind==='phantom'?0.72:1.0});
     this.mesh = new THREE.Mesh(geo, mat);
     this._origEmissive = this.def.color;
     this.mesh.position.set(x, this.def.size+0.1, z);
@@ -51,7 +78,7 @@ class Enemy {
       this.barSprite = barSprite; this.mesh.add(barSprite);
     }
     // Eyes
-    const eyeColor = kind==='boss' ? 0xff3333 : kind==='phantom' ? 0x88ccff : kind==='tank' ? 0x44ff44 : 0xffff44;
+    const eyeColor = enemyEyeColor(kind);
     const eyeMat = new THREE.MeshBasicMaterial({color: eyeColor, transparent:kind==='phantom', opacity:0.9});
     if(kind !== 'boss'){
       const eg = new THREE.SphereGeometry(this.def.size*0.18, 6, 6);
@@ -77,11 +104,27 @@ class Enemy {
       this._flashTimer -= dt;
       if(this._flashTimer <= 0){ this._flashing = false; const m=this.mesh.material; if(m && m.emissive) m.emissive.setHex(this._origEmissive); }
     }
+    // Flamethrower burn — damage over time without hit-flash spam
+    if(this._burnT > 0){
+      this._burnT -= dt;
+      this._burnAcc = (this._burnAcc||0) + dt;
+      if(this._burnAcc >= 0.25){
+        this._burnAcc -= 0.25;
+        spawnSpark(this.mesh.position.clone().add(_burnOff.set(0,this.def.size,0)), 0xff6622, 0.12);
+        this.hp -= this._burnDps * 0.25;
+        this._lastHpDrawn = -1;
+        if(this.hp <= 0){ this._burnT = 0; this.die(false); return; }
+      }
+    }
     const px=camera.position.x, pz=camera.position.z;
     const dx=px-this.mesh.position.x, dz=pz-this.mesh.position.z;
     const dist=Math.sqrt(dx*dx+dz*dz);
     this.mesh.rotation.y = Math.atan2(dx, dz);
     this.attackCooldown -= dt;
+    // Bomber: rush into melee range and detonate
+    if(this.def.bomb && dist < 1.7){ this.takeDamage(this.hp, false); return; }
+    // Bomber tick — faster pulse as it closes in (telegraph)
+    if(this.def.bomb) this.mesh.scale.setScalar(1 + Math.sin(clock.elapsedTime * (dist<6?9:5)) * 0.1);
     const attackRange = this.def.attackRange || 1.6;
     const diffCfg = DIFFICULTIES[difficulty];
     // LOS raycast staggered every ~0.12-0.22s per enemy (was 2 identical raycasts every frame)
@@ -92,13 +135,32 @@ class Enemy {
       this._losBlockedCached = this.losBlocked(this.mesh.position, _losTarget);
     }
     const hasLOS = !this._losBlockedCached;
-    if(this.def.ranged && dist < (this.def.attackRange||16) && this.attackCooldown <= 0 && hasLOS){
+    if(this.def.ranged && !this.def.support && dist < (this.def.attackRange||16) && this.attackCooldown <= 0 && hasLOS){
       this.attackCooldown = this.def.attackCooldown || 1.8;
       const from = this.mesh.position.clone(); from.y += this.def.size*0.5;
       spawnEnemyProjectile(from, camera.position.clone(), this.def.damage * diffCfg.enemyDmgMult);
     } else if(!this.def.ranged && dist < attackRange && this.attackCooldown <= 0 && hasLOS){
       this.attackCooldown = this.def.attackCooldown || 1.0;
       takeDamage(this.def.damage * diffCfg.enemyDmgMult, this.mesh.position);
+    }
+    // Healer: pulse green healing into wounded allies (and itself)
+    if(this.def.support){
+      this._healTimer = (this._healTimer||0) - dt;
+      if(this._healTimer <= 0){
+        this._healTimer = this.def.healRate;
+        let best = null, bestD = this.def.healRange;
+        for(const e of enemies){
+          if(e === this || !e.alive || e.dying) continue;
+          const d = e.mesh.position.distanceTo(this.mesh.position);
+          if(d < bestD && e.hp < e.maxHp){ best = e; bestD = d; }
+        }
+        const target = best || (this.hp < this.maxHp ? this : null);
+        if(target){
+          target.hp = Math.min(target.maxHp, target.hp + this.def.heal);
+          target._lastHpDrawn = -1;
+          for(let i=0;i<5;i++) spawnSpark(target.mesh.position.clone(), 0x55ffcc, 0.1);
+        }
+      }
     }
     const hasVision = dist < 22 && hasLOS;
     if(hasVision){
@@ -123,7 +185,17 @@ class Enemy {
         if(this._wanderTime>2.5){ this._wanderTime=0; this.state='LOST'; this.visionBlockedTime=0; this.lastSeenPos={x:px,z:pz}; }
       }
     }
-    const speed = this.def.speed * diffCfg.enemySpeedMult;
+    let speed = this.def.speed * diffCfg.enemySpeedMult;
+    // Jumper: wind up, then hop forward in a burst
+    if(this.def.leap){
+      if(this._leapT > 0){ this._leapT -= dt; speed *= 3.0; }
+      else {
+        this._leapCd -= dt;
+        if(this._leapCd <= 0 && (this.state==='PURSUE'||this.state==='LOST') && dist > 2.5){
+          this._leapT = this.def.leap; this._leapCd = this.def.leapCd;
+        }
+      }
+    }
     if(this.state==='PURSUE'||this.state==='LOST'||this.state==='ALERT'){
       // --- B* pathing: head for the player's real position when LOS is broken or we're wedged ---
       const oldX=this.mesh.position.x, oldZ=this.mesh.position.z;
@@ -177,7 +249,9 @@ class Enemy {
       const wl=Math.sqrt(wdx*wdx+wdz*wdz)+0.001;
       this.move(wdx/wl,wdz/wl,speed*.7*dt);
     }
-    this.mesh.position.y = this.def.size + 0.1 + Math.sin(clock.elapsedTime*4)*0.08;
+    let hopY = 0;
+    if(this.def.leap && this._leapT > 0) hopY = Math.sin((1 - this._leapT/this.def.leap) * Math.PI) * 0.9;
+    this.mesh.position.y = this.def.size + 0.1 + Math.sin(clock.elapsedTime*4)*0.08 + hopY;
     if(this.def.kind==='boss'){ this.mesh.rotation.x += dt*0.5; this.mesh.rotation.z += dt*0.3; }
     this.updateHpBar();
   }
@@ -219,6 +293,11 @@ class Enemy {
     const len = Math.min(_losDir.length(), 18); _losDir.normalize();
     _losRC.set(from, _losDir, 0, len);
     return _losRC.intersectObjects(wallMeshes, false).length > 0;
+  }
+  applyBurn(dps, dur){
+    if(!this.alive || this.dying) return;
+    this._burnDps = Math.max(this._burnDps || 0, dps);
+    this._burnT = Math.max(this._burnT || 0, dur);
   }
   takeDamage(dmg, headshot){
     if(!this.alive || this.dying) return;
@@ -271,6 +350,28 @@ class Enemy {
       audio.explosion(); addShake(1.0);
       for(let i=0;i<15;i++) spawnSpark(pos.clone(), i%3===0?0xffff00:i%3===1?0xff6600:0xff3300, 0.18+Math.random()*0.18);
     }
+    // Bomber detonation — chain-kills other bombers (die() re-entry is guarded above)
+    if(this.def.bomb && !this._exploded){
+      this._exploded = true;
+      const pos = this.mesh.position.clone();
+      const expMesh = new THREE.Mesh(new THREE.SphereGeometry(2.4,16,16), new THREE.MeshBasicMaterial({color:0xff7722,transparent:true,opacity:.9,blending:THREE.AdditiveBlending}));
+      expMesh.position.copy(pos); scene.add(expMesh);
+      explosions.push({mesh:expMesh, time:0, maxTime:.55});
+      const bCore = new THREE.Mesh(new THREE.SphereGeometry(1.0,12,12), new THREE.MeshBasicMaterial({color:0xffff66,transparent:true,opacity:1,blending:THREE.AdditiveBlending}));
+      bCore.position.copy(pos); scene.add(bCore);
+      explosions.push({mesh:bCore, time:0, maxTime:.3});
+      const bLight = new THREE.PointLight(0xff8800,16,18,1.5); bLight.position.copy(pos); scene.add(bLight);
+      setTimeout(()=>{ if(bLight.parent) scene.remove(bLight); }, 300);
+      const bRadius = 4;
+      // Scale with enemy HP so bombers chain-kill each other at any difficulty
+      const bDmg = 120 * (DIFFICULTIES[difficulty]?.enemyHpMult || 1);
+      for(const en of enemies){ if(en !== this && en.alive && !en.dying && pos.distanceTo(en.mesh.position) < bRadius){ en.takeDamage(bDmg, false); } }
+      for(const other of explosiveBarrels){ if(!other.exploded && pos.distanceTo(other.pos) < bRadius){ setTimeout(()=>detonateBarrel(other), 60); } }
+      const bDist = pos.distanceTo(camera.position);
+      if(bDist < bRadius) takeDamage(Math.max(8, Math.round(55 * (1 - bDist/bRadius*0.55))), pos);
+      audio.explosion(); addShake(0.7);
+      for(let i=0;i<12;i++) spawnSpark(pos.clone(), i%2?0xff8800:0xffcc44, 0.14+Math.random()*0.14);
+    }
     if(this.def.kind === 'boss'){
       state.score += 1000; state.credits += 500; bossKills++;
       spawnPickup(this.mesh.position.x, this.mesh.position.z, 'medkit');
@@ -283,6 +384,30 @@ class Enemy {
     else if(dropRoll < 0.50+luckBoost){ spawnPickup(this.mesh.position.x, this.mesh.position.z, 'grenade_black'); }
     else if(dropRoll < 0.57+luckBoost){ spawnPowerup(this.mesh.position.x, this.mesh.position.z); }
     audio.enemyDeath();
+    // Splitter: burst into swarmlings before the wave-complete check below
+    if(this.def.split){
+      for(let i=0;i<this.def.split;i++){
+        const child = new Enemy(
+          this.mesh.position.x + (Math.random()-.5)*1.8,
+          this.mesh.position.z + (Math.random()-.5)*1.8,
+          'swarmling', state.wave
+        );
+        // Nudge out of geometry so babies never spawn inside a wall
+        for(let t=0;t<5;t++){
+          const cb = new THREE.Box3(
+            new THREE.Vector3(child.mesh.position.x-child.size, 0, child.mesh.position.z-child.size),
+            new THREE.Vector3(child.mesh.position.x+child.size, 1.2, child.mesh.position.z+child.size)
+          );
+          let stuck = false;
+          for(const col of wallColliders){ if(col && cb.intersectsBox(col)){ stuck = true; break; } }
+          if(!stuck) break;
+          child.mesh.position.set(this.mesh.position.x+(Math.random()-.5)*3, child.def.size+0.1, this.mesh.position.z+(Math.random()-.5)*3);
+        }
+        enemies.push(child);
+        state.enemiesAlive++; state.enemiesTotal++;
+      }
+      for(let i=0;i<8;i++) spawnSpark(this.mesh.position.clone(), 0x88ff55, 0.12+Math.random()*0.1);
+    }
     // Only complete wave when all enemies have spawned AND all are dead
     if(state.enemiesAlive <= 0 && spawnQueue.length === 0 && enemies.filter(e=>e.alive && !e.dying).length === 0 && waveActive) completeWave();
   }

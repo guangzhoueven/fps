@@ -88,7 +88,7 @@ function toggleWeaponStatsPanel(){
   if(!panel || !content) return;
   if(wpStatsVisible){
     // Build stats for all owned weapons
-    const owned = ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun'].filter(id => ownedWeapons.has(id));
+    const owned = ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun','tesla','flamer','ricochet'].filter(id => ownedWeapons.has(id));
     let html = '';
     for(const id of owned){
       const w = WEAPONS[id];

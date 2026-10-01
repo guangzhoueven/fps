@@ -50,7 +50,10 @@
     "sniper": "狙击枪",
     "rocket": "火箭筒",
     "crossbow": "弩",
-    "minigun": "机枪"
+    "minigun": "机枪",
+    "tesla": "电弧枪",
+    "flamer": "火焰喷射器",
+    "ricochet": "跳弹枪"
   },
   "enemy": {
     "grunt": "步兵",
@@ -59,7 +62,12 @@
     "shooter": "射手",
     "boss": "巨兽",
     "phantom": "幻影",
-    "tank": "重坦"
+    "tank": "重坦",
+    "bomber": "爆虫",
+    "splitter": "分裂体",
+    "swarmling": "虫群",
+    "healer": "医疗兵",
+    "jumper": "跃袭者"
   },
   "powerup": {
     "speed": "加速",

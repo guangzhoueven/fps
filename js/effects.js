@@ -37,9 +37,60 @@ function spawnBlood(pos, color, size){
     particles.push({mesh, vx:(Math.random()-.5)*6, vy:Math.random()*4, vz:(Math.random()-.5)*6, life:.6, maxLife:.6, gravity:true, fromPool:true});
   }
 }
+// Flamethrower cone — pooled particles drifting forward, no gravity
+const _flameV = new THREE.Vector3();
+function spawnFlame(origin, dir, count){
+  for(let i=0;i<count;i++){
+    const mesh = acquirePooledMesh(particlePool, _particleGeoShared, 0xffffff);
+    mesh.material.color.setHex(Math.random()<0.5 ? 0xff7722 : 0xffcc33);
+    mesh.scale.setScalar((0.10 + Math.random()*0.12)/0.08);
+    const d = 0.4 + i*1.1 + Math.random()*0.6;
+    mesh.position.copy(origin).addScaledVector(dir, d);
+    mesh.position.x += (Math.random()-.5)*0.5; mesh.position.y += (Math.random()-.5)*0.5; mesh.position.z += (Math.random()-.5)*0.5;
+    mesh.visible = true;
+    _flameV.copy(dir).multiplyScalar(2.5);
+    particles.push({mesh, vx:_flameV.x+(Math.random()-.5)*1.5, vy:_flameV.y+1.2, vz:_flameV.z+(Math.random()-.5)*1.5,
+      life:.3+Math.random()*.2, maxLife:.5, gravity:false, fromPool:true});
+  }
+}
+// Chain-lightning arcs — fixed-point buffers reused from a small pool
+const _LT_SEGS = 6, _LT_PTS = _LT_SEGS + 1;
+const lightningPool = [];
+let lightnings = [];
+function spawnLightning(from, to){
+  let line = null;
+  for(const l of lightningPool){ if(!l.visible){ line = l; break; } }
+  if(!line){
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(_LT_PTS*3), 3));
+    const mat = new THREE.LineBasicMaterial({color:0x88eeff, transparent:true, opacity:1, blending:THREE.AdditiveBlending, depthWrite:false});
+    line = new THREE.Line(geo, mat); line.frustumCulled = false; line.visible = false;
+    scene.add(line); lightningPool.push(line);
+  }
+  const arr = line.geometry.attributes.position.array;
+  for(let i=0;i<_LT_PTS;i++){
+    const t = i/_LT_SEGS;
+    let x = from.x + (to.x-from.x)*t, y = from.y + (to.y-from.y)*t, z = from.z + (to.z-from.z)*t;
+    if(i>0 && i<_LT_SEGS){ x += (Math.random()-.5)*0.55; y += (Math.random()-.5)*0.55; z += (Math.random()-.5)*0.55; }
+    arr[i*3]=x; arr[i*3+1]=y; arr[i*3+2]=z;
+  }
+  line.geometry.attributes.position.needsUpdate = true;
+  line.visible = true; line.material.opacity = 1;
+  lightnings.push({line, life:0.15, maxLife:0.15});
+}
+function updateLightnings(dt){
+  for(let i=lightnings.length-1; i>=0; i--){
+    const l = lightnings[i]; l.life -= dt;
+    if(l.life <= 0){ l.line.visible = false; lightnings.splice(i,1); continue; }
+    l.line.material.opacity = l.life / l.maxLife;
+  }
+}
 function spawnTracer(from, to){
   // Pooled tracer mesh (grows the pool instead of allocating on overflow)
   const mesh = acquirePooledMesh(tracerPool, _tracerGeoShared, 0xffdd66);
+  // Each pooled tracer needs its own geometry — otherwise every live tracer
+  // renders whatever endpoints were written last (shared BufferAttribute).
+  if(!mesh.userData.ownGeo){ mesh.geometry = _tracerGeoShared.clone(); mesh.userData.ownGeo = true; }
   const positions = mesh.geometry.attributes.position;
   if(positions){
     positions.setXYZ(0, from.x, from.y, from.z);
@@ -154,6 +205,7 @@ function updateParticles(dt){
     if(ex.time >= ex.maxTime){ scene.remove(ex.mesh); explosions.splice(i,1); continue; }
     const p = ex.time/ex.maxTime, s = 1+p*3; ex.mesh.scale.set(s,s,s); ex.mesh.material.opacity = 1-p;
   }
+  updateLightnings(dt);
 }
 function updateScorePopups(dt){
   for(let i=scorePopups.length-1; i>=0; i--){

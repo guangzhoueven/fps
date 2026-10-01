@@ -37,6 +37,9 @@ function updateWeaponMesh(){
     case 'rocket': add(new THREE.CylinderGeometry(0.07,0.07,0.5,12),metalMat,0,0,-0.2,Math.PI/2); add(new THREE.ConeGeometry(0.075,0.12,12),darkMat,0,0,-0.5,Math.PI/2); add(new THREE.BoxGeometry(0.05,0.1,0.06),gripMat,0,-0.09,0,0.2); add(new THREE.BoxGeometry(0.03,0.04,0.1),darkMat,0,0.08,-0.05); muzzleZ=-0.56; break;
     case 'crossbow': add(new THREE.BoxGeometry(0.05,0.12,0.5),metalMat,0,0.02,-0.22); add(new THREE.CylinderGeometry(0.015,0.015,0.35,8),darkMat,0,0.06,-0.1,0); add(new THREE.BoxGeometry(0.06,0.06,0.14),gripMat,0,-0.04,0.04,0.2); add(new THREE.CylinderGeometry(0.012,0.012,0.25,8),metalMat,0,0.02,-0.48,Math.PI/2); muzzleZ=-0.6; break;
     case 'minigun': add(new THREE.CylinderGeometry(0.05,0.05,0.5,10),metalMat,0,0,-0.22,Math.PI/2); for(let b=0;b<3;b++){add(new THREE.CylinderGeometry(0.025,0.025,0.12,6),darkMat,0,0,-0.08+b*0.08,Math.PI/2);} add(new THREE.BoxGeometry(0.06,0.06,0.1),gripMat,0,-0.06,0.05,0.15); add(new THREE.BoxGeometry(0.04,0.05,0.14),gripMat,0,-0.02,0.1); muzzleZ=-0.5; break;
+    case 'tesla': add(new THREE.BoxGeometry(0.08,0.09,0.3),metalMat,0,0,-0.15); for(let i=0;i<3;i++) add(new THREE.CylinderGeometry(0.032,0.032,0.1,8),darkMat,0,0.02,-0.06-i*0.08,Math.PI/2); add(new THREE.SphereGeometry(0.04,8,8),new THREE.MeshStandardMaterial({color:0x33ddff,emissive:0x33ddff,emissiveIntensity:1.6,roughness:.3}),0,0.02,-0.37); add(new THREE.BoxGeometry(0.05,0.12,0.06),gripMat,0,-0.1,0.05,0.25); muzzleZ=-0.4; break;
+    case 'flamer': add(new THREE.CylinderGeometry(0.055,0.055,0.28,10),metalMat,0.035,0.03,-0.13,Math.PI/2); add(new THREE.CylinderGeometry(0.02,0.05,0.24,8),darkMat,0,-0.01,-0.3,Math.PI/2); add(new THREE.BoxGeometry(0.07,0.1,0.16),darkMat,0,-0.03,0.03); add(new THREE.BoxGeometry(0.05,0.12,0.06),gripMat,0,-0.1,0.07,0.25); muzzleZ=-0.42; break;
+    case 'ricochet': add(new THREE.BoxGeometry(0.07,0.08,0.32),metalMat,0,0,-0.16); add(new THREE.CylinderGeometry(0.02,0.02,0.2,8),darkMat,-0.028,0.02,-0.3,Math.PI/2); add(new THREE.CylinderGeometry(0.02,0.02,0.2,8),darkMat,0.028,0.02,-0.3,Math.PI/2); add(new THREE.BoxGeometry(0.05,0.12,0.06),gripMat,0,-0.1,0.05,0.25); muzzleZ=-0.4; break;
   }
   muzzleFlash.position.set(0,0,muzzleZ);
   muzzleSprite.position.set(0,0,muzzleZ-0.02);
@@ -47,7 +50,7 @@ function updateWeaponMesh(){
 // ============================================================================
 function rebuildInventory(){
   const inv = [];
-  for(const id of ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun']){
+  for(const id of ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun','tesla','flamer','ricochet']){
     if(ownedWeapons.has(id)){ const w=WEAPONS[id]; inv.push({type:id,icon:w.icon,label:w.name}); }
   }
   inv.push({type:'grenade',icon:'💣',label:'grenade',count:state.grenades});
@@ -118,6 +121,7 @@ function fireRay(w){
   _fireRC.setFromCamera(ndc, camera);
   if(w.explosive){ spawnRocket(_fireRC.ray.direction.clone()); return; }
   if(w.projectile){ spawnBolt(_fireRC.ray.direction.clone()); return; }
+  if(w.bounce){ fireRayBounce(w, ndc); return; }
   const hits = _fireRC.intersectObjects(_fireTargets, true);
   let endPoint = null;
   for(const hit of hits){
@@ -139,6 +143,8 @@ function fireRay(w){
       if(hasPowerup('damage')) dmg *= 2;
       if(headshot) dmg *= 2.2;
       enemyRef.takeDamage(dmg, headshot);
+      if(w.burn) enemyRef.applyBurn(w.burn.dps, w.burn.dur);
+      if(w.chain) chainLightning(hit.point, enemyRef, w, dmg);
       state.stats.shotsHit++; state.stats.damageDealt += dmg;
       spawnSpark(hit.point, 0xff4400, 0.15);
       spawnDamageNumber(hit.point.clone(), Math.round(dmg), headshot);
@@ -155,7 +161,89 @@ function fireRay(w){
     break;
   }
   if(!endPoint) endPoint = _fireRC.ray.origin.clone().add(_fireRC.ray.direction.clone().multiplyScalar(w.range));
+  if(w.flamer) spawnFlame(getMuzzlePos(), _fireRC.ray.direction, 5);
   spawnTracer(getMuzzlePos(), endPoint);
+}
+// Tesla arc — jumps from the struck enemy to nearby ones with damage falloff
+function chainLightning(from, first, w, baseDmg){
+  const visited = new Set([first]);
+  let src = from.clone(), dmg = baseDmg * (w.chainFalloff || 0.6);
+  let remaining = w.chain;
+  while(remaining > 0){
+    let best = null, bestD = w.chainRange;
+    for(const e of enemies){
+      if(!e.alive || e.dying || visited.has(e)) continue;
+      const d = e.mesh.position.distanceTo(src);
+      if(d < bestD){ bestD = d; best = e; }
+    }
+    if(!best) break;
+    const tgt = best.mesh.position.clone();
+    spawnLightning(src, tgt);
+    best.takeDamage(dmg, false);
+    spawnSpark(tgt, 0x66ddff, 0.14);
+    visited.add(best); src = tgt; dmg *= (w.chainFalloff || 0.6); remaining--;
+  }
+}
+// Ricochet round — reflects off surfaces (world-space normal) and keeps going
+const _bounceRC = new THREE.Raycaster();
+const _bounceN = new THREE.Vector3();
+const _bounceNM = new THREE.Matrix3();
+function fireRayBounce(w, ndc){
+  _bounceRC.setFromCamera(ndc, camera);
+  const pts = [getMuzzlePos().clone()];
+  let dmg = w.damage * damageMult;
+  if(hasPowerup('damage')) dmg *= 2;
+  const dir = _bounceRC.ray.direction.clone();
+  const origin = _bounceRC.ray.origin.clone();
+  let left = w.range, endPoint = null, bounces = 0;
+  while(true){
+    _bounceRC.set(origin, dir);
+    _bounceRC.near = 0; _bounceRC.far = left;
+    const hits = _bounceRC.intersectObjects(_fireTargets, true);
+    let hit = null;
+    for(const h of hits){
+      let p = h.object, own = false;
+      while(p){ if(p===weaponGroup||p===camera){own=true;break;} p=p.parent; }
+      if(own) continue;
+      hit = h; break;
+    }
+    if(!hit){ endPoint = origin.clone().addScaledVector(dir, left); break; }
+    pts.push(hit.point.clone());
+    let enemyRef = hit.object.userData.enemyRef;
+    if(!enemyRef){ let pp = hit.object.parent; while(pp && !enemyRef){ enemyRef = pp.userData.enemyRef; pp = pp.parent; } }
+    if(enemyRef && enemyRef.alive){
+      const headshot = hit.point.y > enemyRef.mesh.position.y + 0.55;
+      let d = dmg * (headshot ? 2.2 : 1);
+      enemyRef.takeDamage(d, headshot);
+      state.stats.shotsHit++; state.stats.damageDealt += d;
+      spawnSpark(hit.point, 0xff4400, 0.15);
+      spawnDamageNumber(hit.point.clone(), Math.round(d), headshot);
+      showHitmarker(headshot, !enemyRef.alive);
+      endPoint = hit.point.clone();
+      break;
+    }
+    if(hit.object.userData.explosiveBarrel){
+      const barrel = explosiveBarrels.find(b=>b.mesh===hit.object && !b.exploded);
+      if(barrel){ detonateBarrel(barrel); endPoint = hit.point.clone(); break; }
+    }
+    spawnSpark(hit.point, 0xaaddff, 0.1);
+    spawnDecal(hit.point, hit.face?.normal || new THREE.Vector3(0,1,0));
+    if(bounces >= w.bounce || !hit.face){ endPoint = hit.point.clone(); break; }
+    // Reflect the ray about the surface normal in world space
+    _bounceNM.getNormalMatrix(hit.object.matrixWorld);
+    _bounceN.copy(hit.face.normal).applyMatrix3(_bounceNM).normalize();
+    const into = dir.dot(_bounceN);
+    if(into >= -0.02){ endPoint = hit.point.clone(); break; } // grazing — let it slide out
+    dir.addScaledVector(_bounceN, -2*into).normalize();
+    origin.copy(hit.point).addScaledVector(_bounceN, 0.03);
+    left -= hit.distance;
+    if(left <= 0.5){ endPoint = origin.clone(); break; }
+    dmg *= (w.bounceDamage || 0.75);
+    bounces++;
+  }
+  if(!endPoint) endPoint = origin.clone().addScaledVector(dir, left);
+  for(let i=0;i<pts.length-1;i++) spawnTracer(pts[i], pts[i+1]);
+  if(pts[pts.length-1] !== endPoint) spawnTracer(pts[pts.length-1], endPoint);
 }
 const _muzzleV = new THREE.Vector3();
 function getMuzzlePos(){ _muzzleV.set(0,0,-0.32); weaponGroup.localToWorld(_muzzleV); return _muzzleV; }

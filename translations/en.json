@@ -50,7 +50,10 @@
     "sniper": "Sniper",
     "rocket": "Rocket",
     "crossbow": "Crossbow",
-    "minigun": "Minigun"
+    "minigun": "Minigun",
+    "tesla": "Tesla Chain",
+    "flamer": "Flamethrower",
+    "ricochet": "Ricochet"
   },
   "enemy": {
     "grunt": "Grunt",
@@ -59,7 +62,12 @@
     "shooter": "Shooter",
     "boss": "Behemoth",
     "phantom": "Phantom",
-    "tank": "Tank"
+    "tank": "Tank",
+    "bomber": "Bomber",
+    "splitter": "Splitter",
+    "swarmling": "Swarmling",
+    "healer": "Medic",
+    "jumper": "Leaper"
   },
   "powerup": {
     "speed": "Speed Boost",

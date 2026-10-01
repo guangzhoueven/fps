@@ -24,7 +24,7 @@ function toastAction(msg, btnLabel, cb, variant='info'){
 // Minimap
 const mmCanvas = document.getElementById('minimap');
 const mmCtx = mmCanvas ? mmCanvas.getContext('2d') : null;
-const _MM_COLORS = {boss:'#ff2222', brute:'#aa44cc', shooter:'#22aacc', runner:'#ddaa22'};
+const _MM_COLORS = {boss:'#ff2222', brute:'#aa44cc', shooter:'#22aacc', runner:'#ddaa22', bomber:'#ff7722', splitter:'#66bb44', healer:'#55eebb', jumper:'#ff55aa', swarmling:'#aaee44'};
 const _MM_DEFAULT_COLOR = '#cc3333';
 // Wall rects in world space — rebuilt only when wallMeshes changes
 let _wallRects = null;

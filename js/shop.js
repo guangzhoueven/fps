@@ -13,7 +13,7 @@ function showShop(){
   document.getElementById('shop-credits').textContent = state.credits;
   const grid = document.getElementById('shop-grid'); grid.innerHTML = '';
   // Weapons for sale
-  for(const id of ['smg','shotgun','rifle','sniper','rocket','crossbow','minigun']){
+  for(const id of ['smg','shotgun','rifle','sniper','rocket','crossbow','minigun','flamer','ricochet','tesla']){
     const w = WEAPONS[id];
     if(ownedWeapons.has(id)) continue;
     const price = Math.round(w.price * (1 - shopDiscount));
@@ -22,7 +22,7 @@ function showShop(){
     grid.appendChild(item);
   }
   // Ammo refills
-  for(const id of ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun']){
+  for(const id of ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun','tesla','flamer','ricochet']){
     if(!ownedWeapons.has(id)) continue;
     const w = WEAPONS[id];
     const price = Math.round((w.price*0.25||100) * (1-shopDiscount));
