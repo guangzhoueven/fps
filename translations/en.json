@@ -168,7 +168,7 @@
     "ammo": "Ammo",
     "damage": "Damage",
     "mag": "Mag",
-    "refillToMax": "Refill to max",
+    "refillToMax": "Restock",
     "upgradeMaxHp": "Max Health +25",
     "upgradeMaxHpDesc": "Permanently +25 HP & heal",
     "upgradeMaxArmor": "Max Armor +25",

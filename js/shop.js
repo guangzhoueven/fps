@@ -66,7 +66,7 @@ window.buyWeapon = function(id){
 window.buyAmmo = function(id){
   const w = WEAPONS[id]; const price = Math.round((w.price*0.25||100) * (1-shopDiscount));
   if(state.credits < price) return;
-  state.credits -= price; weaponAmmo[id].reserve = w.reserveMax; audio.buy(); showShop();
+  state.credits -= price; weaponAmmo[id].reserve += w.reserveMax; audio.buy(); showShop();
 };
 window.buyUpgrade = function(uid){
   const prices = {upgrade_hp:500, upgrade_armor:500, upgrade_speed:700, upgrade_reload:800};

@@ -168,7 +168,7 @@
     "ammo": "弹药",
     "damage": "伤害",
     "mag": "弹夹",
-    "refillToMax": "补满",
+    "refillToMax": "补充",
     "upgradeMaxHp": "最大生命值 +25",
     "upgradeMaxHpDesc": "永久 +25 生命值并恢复",
     "upgradeMaxArmor": "最大护甲 +25",

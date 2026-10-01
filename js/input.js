@@ -60,7 +60,7 @@ function handleInteraction(){
 }
 function handlePickup(pk){
   if(pk.type==='medkit'){ medkitCount++; rebuildInventory(); audio.pickup(); toast(I18n.t('toast.pickedMedkit'),'success'); return true; }
-  if(pk.type==='ammo'){ const sel=state.inventory[state.selectedSlot]; const w=sel?WEAPONS[sel.type]:null; if(w&&weaponAmmo[w.id]){ weaponAmmo[w.id].reserve = Math.min(w.reserveMax, weaponAmmo[w.id].reserve+30); audio.pickup(); toast(I18n.t('toast.pickupAmmo'),'success'); updateAmmoState(); return true; } weaponAmmo.pistol.reserve = Math.min(WEAPONS.pistol.reserveMax, weaponAmmo.pistol.reserve+30); audio.pickup(); updateAmmoState(); return true; }
+  if(pk.type==='ammo'){ const sel=state.inventory[state.selectedSlot]; const w=sel?WEAPONS[sel.type]:null; if(w&&weaponAmmo[w.id]){ weaponAmmo[w.id].reserve += 30; audio.pickup(); toast(I18n.t('toast.pickupAmmo'),'success'); updateAmmoState(); return true; } weaponAmmo.pistol.reserve += 30; audio.pickup(); updateAmmoState(); return true; }
   if(pk.type==='grenade' || pk.type==='grenade_black'){ state.grenades += 1; rebuildInventory(); audio.pickup(); toast(I18n.t('toast.pickupGrenade'),'success'); return true; }
   if(pk.type==='armor'){ state.armor = Math.min(state.maxArmor, state.armor + 50); audio.pickup(); toast(I18n.t('toast.pickupArmor'),'success'); return true; }
   if(pk.type==='crate'){
@@ -68,8 +68,8 @@ function handlePickup(pk){
     medkitCount += 2;
     const sel = state.inventory[state.selectedSlot];
     const w = sel ? WEAPONS[sel.type] : null;
-    if(w && weaponAmmo[w.id]) weaponAmmo[w.id].reserve = Math.min(w.reserveMax, weaponAmmo[w.id].reserve + 30);
-    else weaponAmmo.pistol.reserve = Math.min(WEAPONS.pistol.reserveMax, weaponAmmo.pistol.reserve + 30);
+    if(w && weaponAmmo[w.id]) weaponAmmo[w.id].reserve += 30;
+    else weaponAmmo.pistol.reserve += 30;
     state.grenades += 2;
     rebuildInventory(); updateAmmoState();
     audio.pickup(); audio.buy();
