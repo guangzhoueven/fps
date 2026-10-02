@@ -27,7 +27,8 @@ function showShop(){
     const w = WEAPONS[id];
     const price = Math.round((w.price*0.25||100) * (1-shopDiscount));
     const item = document.createElement('div'); item.className = 'shop-item';
-    item.innerHTML = `<div class="si">📦</div><div class="sn">${I18n.t('weapon.' + w.id)} ${I18n.t('shop.ammo')}</div><div class="sd">${I18n.t('shop.refillToMax')} (${w.reserveMax})</div><div class="sp">${price}🪙</div><button ${state.credits<price?'disabled':''} onclick="buyAmmo('${id}')">${I18n.t('shop.buy')}</button>`;
+    const full = weaponAmmo[id] && weaponAmmo[id].reserve >= w.reserveMax;
+    item.innerHTML = `<div class="si">📦</div><div class="sn">${I18n.t('weapon.' + w.id)} ${I18n.t('shop.ammo')}</div><div class="sd">${I18n.t('shop.refillToMax')} (${w.reserveMax})</div><div class="sp">${price}🪙</div><button ${state.credits<price||full?'disabled':''} onclick="buyAmmo('${id}')">${I18n.t('shop.buy')}</button>`;
     grid.appendChild(item);
   }
   // Upgrades
@@ -65,8 +66,12 @@ window.buyWeapon = function(id){
 };
 window.buyAmmo = function(id){
   const w = WEAPONS[id]; const price = Math.round((w.price*0.25||100) * (1-shopDiscount));
+  const a = weaponAmmo[id];
+  if(!a || a.reserve >= w.reserveMax) return; // already full — don't charge
   if(state.credits < price) return;
-  state.credits -= price; weaponAmmo[id].reserve += w.reserveMax; audio.buy(); showShop();
+  state.credits -= price; a.reserve = w.reserveMax; // matches the item's "restock to max" description
+  if(ownedWeapons.has(id)) updateAmmoState(); // HUD reads state.reserve — sync immediately
+  audio.buy(); showShop();
 };
 window.buyUpgrade = function(uid){
   const prices = {upgrade_hp:500, upgrade_armor:500, upgrade_speed:700, upgrade_reload:800};

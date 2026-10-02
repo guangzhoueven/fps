@@ -43,12 +43,14 @@ function updateWeaponMesh(){
   }
   muzzleFlash.position.set(0,0,muzzleZ);
   muzzleSprite.position.set(0,0,muzzleZ-0.02);
+  weaponGroup.userData.muzzleZ = muzzleZ;
 }
 
 // ============================================================================
 // INVENTORY
 // ============================================================================
 function rebuildInventory(){
+  const prevType = state.inventory[state.selectedSlot] ? state.inventory[state.selectedSlot].type : null;
   const inv = [];
   for(const id of ['pistol','smg','shotgun','rifle','sniper','rocket','crossbow','minigun','tesla','flamer','ricochet']){
     if(ownedWeapons.has(id)){ const w=WEAPONS[id]; inv.push({type:id,icon:w.icon,label:w.name}); }
@@ -59,6 +61,8 @@ function rebuildInventory(){
   while(inv.length < 8) inv.push({type:'',icon:'—',label:''});
   state.inventory = inv;
   if(state.selectedSlot >= inv.length) state.selectedSlot = 0;
+  // Keep the same ITEM selected — the fixed weapon order shifts every slot after a purchase
+  if(prevType){ const idx = inv.findIndex(s => s && s.type === prevType); if(idx >= 0) state.selectedSlot = idx; }
   updateWeaponMesh();
   updateAmmoState();
 }
@@ -94,7 +98,7 @@ function fireWeapon(){
   const w = WEAPONS[sel.type];
   if(!w || state.reloading) return;
   const ammo = weaponAmmo[w.id];
-  if(!ammo || ammo.mag<=0){ audio.empty(); if(ammo&&ammo.reserve>0) doReload(); return; }
+  if(!ammo || ammo.mag<=0){ if(!audio._emptyT || performance.now()-audio._emptyT > 150){ audio._emptyT = performance.now(); audio.empty(); } if(ammo&&ammo.reserve>0) doReload(); return; }
   const rapid = hasPowerup('rapid');
   const effRate = rapid ? w.fireRate*0.4 : w.fireRate;
   if(fireCooldown > 0) return;
@@ -110,7 +114,7 @@ function fireWeapon(){
   camera.updateMatrixWorld();
   _fireTargets.length = 0;
   for(const wm of wallMeshes) _fireTargets.push(wm);
-  for(const en of enemies) if(en.alive) _fireTargets.push(en.mesh);
+  for(const en of enemies) if(en.alive && !en.dying) _fireTargets.push(en.mesh);
   for(const b of explosiveBarrels) if(!b.exploded) _fireTargets.push(b.mesh);
   for(let p=0;p<w.pellets;p++) fireRay(w);
   updateAmmoState();
@@ -137,18 +141,18 @@ function fireRay(w){
       let pp = hit.object.parent;
       while(pp && !enemyRef){ enemyRef = pp.userData.enemyRef; pp = pp.parent; }
     }
-    if(enemyRef && enemyRef.alive){
-      const headshot = hit.point.y > enemyRef.mesh.position.y + 0.55;
+    if(enemyRef && enemyRef.alive && !enemyRef.dying){
+      const headshot = hit.point.y > enemyRef.mesh.position.y + enemyRef.size * 0.45;
       let dmg = w.damage * damageMult;
       if(hasPowerup('damage')) dmg *= 2;
       if(headshot) dmg *= 2.2;
-      enemyRef.takeDamage(dmg, headshot);
+      const killed = enemyRef.takeDamage(dmg, headshot);
       if(w.burn) enemyRef.applyBurn(w.burn.dps, w.burn.dur);
       if(w.chain) chainLightning(hit.point, enemyRef, w, dmg);
       state.stats.shotsHit++; state.stats.damageDealt += dmg;
       spawnSpark(hit.point, 0xff4400, 0.15);
       spawnDamageNumber(hit.point.clone(), Math.round(dmg), headshot);
-    showHitmarker(headshot, !enemyRef?.alive);
+      showHitmarker(headshot, killed);
       break;
     }
     // Explosive barrel?
@@ -171,7 +175,7 @@ function chainLightning(from, first, w, baseDmg){
   let remaining = w.chain;
   while(remaining > 0){
     let best = null, bestD = w.chainRange;
-    for(const e of enemies){
+    for(const e of enemies.slice()){ // snapshot — a kill can spawn splitter children mid-loop
       if(!e.alive || e.dying || visited.has(e)) continue;
       const d = e.mesh.position.distanceTo(src);
       if(d < bestD){ bestD = d; best = e; }
@@ -211,14 +215,14 @@ function fireRayBounce(w, ndc){
     pts.push(hit.point.clone());
     let enemyRef = hit.object.userData.enemyRef;
     if(!enemyRef){ let pp = hit.object.parent; while(pp && !enemyRef){ enemyRef = pp.userData.enemyRef; pp = pp.parent; } }
-    if(enemyRef && enemyRef.alive){
-      const headshot = hit.point.y > enemyRef.mesh.position.y + 0.55;
+    if(enemyRef && enemyRef.alive && !enemyRef.dying){
+      const headshot = hit.point.y > enemyRef.mesh.position.y + enemyRef.size * 0.45;
       let d = dmg * (headshot ? 2.2 : 1);
-      enemyRef.takeDamage(d, headshot);
+      const killed = enemyRef.takeDamage(d, headshot);
       state.stats.shotsHit++; state.stats.damageDealt += d;
       spawnSpark(hit.point, 0xff4400, 0.15);
       spawnDamageNumber(hit.point.clone(), Math.round(d), headshot);
-      showHitmarker(headshot, !enemyRef.alive);
+      showHitmarker(headshot, killed);
       endPoint = hit.point.clone();
       break;
     }
@@ -246,7 +250,7 @@ function fireRayBounce(w, ndc){
   if(pts[pts.length-1] !== endPoint) spawnTracer(pts[pts.length-1], endPoint);
 }
 const _muzzleV = new THREE.Vector3();
-function getMuzzlePos(){ _muzzleV.set(0,0,-0.32); weaponGroup.localToWorld(_muzzleV); return _muzzleV; }
+function getMuzzlePos(){ _muzzleV.set(0,0, weaponGroup.userData.muzzleZ !== undefined ? weaponGroup.userData.muzzleZ : -0.32); weaponGroup.localToWorld(_muzzleV); return _muzzleV; }
 function spawnRocket(dir){
   const start = getMuzzlePos();
   const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(0.1,0.3,4,8), new THREE.MeshStandardMaterial({color:0x444422,emissive:0xff6600,emissiveIntensity:.8}));

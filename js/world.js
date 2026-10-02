@@ -63,15 +63,20 @@ function buildScene(){
   // Floor — large outdoor ground
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(100,100), floorMat);
   floor.rotation.x = -Math.PI/2; scene.add(floor);
+  wallMeshes.push(floor); // bullets stop at the ground (raycast target)
+  // Projectile sweeps: top sits just below y=0 so grenades still settle on the visual surface
+  solidSlabs.push(new THREE.Box3(new THREE.Vector3(-50,-2,-50), new THREE.Vector3(50,-0.05,50)));
   // Ceilings — only for rooms (not outdoor)
   for(const rm of ROOMS){
     const rc = new THREE.Mesh(new THREE.PlaneGeometry(rm.w, rm.d), ceilMat);
     rc.rotation.x = Math.PI/2; rc.position.set(rm.x, 3.0, rm.z);
     scene.add(rc);
+    wallMeshes.push(rc); // bullets can't pass through room ceilings
     // Roof — visible from outside (top side), darker brown
     const roof = new THREE.Mesh(new THREE.PlaneGeometry(rm.w + 0.6, rm.d + 0.6), new THREE.MeshStandardMaterial({color:0x5a4030, roughness:0.85, side: THREE.DoubleSide}));
     roof.rotation.x = -Math.PI/2; roof.position.set(rm.x, 3.05, rm.z);
     scene.add(roof);
+    wallMeshes.push(roof);
     const roofBox = new THREE.Box3(
       new THREE.Vector3(rm.x-(rm.w+0.6)/2, 2.98, rm.z-(rm.d+0.6)/2),
       new THREE.Vector3(rm.x+(rm.w+0.6)/2, 3.08, rm.z+(rm.d+0.6)/2)
@@ -108,7 +113,11 @@ function buildScene(){
     if(doorAxis === 'x'){ door2Axis = 'z'; door2Side = 'south'; }
     else { door2Axis = 'x'; door2Side = Math.random() < 0.5 ? 'east' : 'west'; }
 
-    const segHalf=(hw*2-DOOR_W)/2, segOff=DOOR_HALF+segHalf;
+    // addStaticWall takes a HALF length: each segment must span exactly [corner, door jamb].
+    // The old values were full segment lengths — doubled segments shoved ~hw metres of
+    // wall past every corner, and the W/E walls reused the x-derived offsets.
+    const segHalf=(hw*2-DOOR_W)/4, segOff=DOOR_HALF+segHalf;
+    const segHalfZ=(hd*2-DOOR_W)/4, segOffZ=DOOR_HALF+segHalfZ;
     // Helper: does this wall have a door?
     const hasDoorN = (doorAxis==='z' && doorSide==='north') || (door2Axis==='z' && door2Side==='north');
     const hasDoorS = (doorAxis==='z' && doorSide==='south') || (door2Axis==='z' && door2Side==='south');
@@ -119,9 +128,9 @@ function buildScene(){
     else addStaticWall(cx,cz+hd,hw,true,wallMat);
     if(hasDoorS){addStaticWall(cx-segOff,cz-hd,segHalf,true,wallMat);addStaticWall(cx+segOff,cz-hd,segHalf,true,wallMat);}
     else addStaticWall(cx,cz-hd,hw,true,wallMat);
-    if(hasDoorW){addStaticWall(cx-hw,cz-segOff,segHalf,false,wallMat);addStaticWall(cx-hw,cz+segOff,segHalf,false,wallMat);}
+    if(hasDoorW){addStaticWall(cx-hw,cz-segOffZ,segHalfZ,false,wallMat);addStaticWall(cx-hw,cz+segOffZ,segHalfZ,false,wallMat);}
     else addStaticWall(cx-hw,cz,hd,false,wallMat);
-    if(hasDoorE){addStaticWall(cx+hw,cz-segOff,segHalf,false,wallMat);addStaticWall(cx+hw,cz+segOff,segHalf,false,wallMat);}
+    if(hasDoorE){addStaticWall(cx+hw,cz-segOffZ,segHalfZ,false,wallMat);addStaticWall(cx+hw,cz+segOffZ,segHalfZ,false,wallMat);}
     else addStaticWall(cx+hw,cz,hd,false,wallMat);
 
     // Create doors
@@ -280,8 +289,10 @@ function buildScene(){
   const buildRoom = (bx, bz, bw, bd, doorWall, floorY, ceilY) => {
     const hw = bw/2, hd = bd/2;
     const DW = 1.4, DH = 2.6, DHF = DW/2;
-    const segH = (bw - DW)/2, segO = DHF + segH;
-    const segH2 = (bd - DW)/2, segO2 = DHF + segH2;
+    // HALF lengths for addStaticWall — segments now span exactly [corner, door jamb]
+    // (the old /2 values were full lengths, doubling each segment past the wall corner)
+    const segH = (bw - DW)/4, segO = DHF + segH;
+    const segH2 = (bd - DW)/4, segO2 = DHF + segH2;
     const hasN = doorWall === 'north';
     const hasS = doorWall === 'south';
     const hasE = doorWall === 'east';
@@ -306,6 +317,8 @@ function buildScene(){
       const flT = 0.16;
       const lf = new THREE.Mesh(new THREE.BoxGeometry(lfW, flT, bd), new THREE.MeshStandardMaterial({map:floorTex(),color:0xffffff,roughness:.92}));
       lf.position.set(bx - hw + lfW/2, floorY - flT/2, bz); scene.add(lf);
+      wallMeshes.push(lf);
+      solidSlabs.push(new THREE.Box3(new THREE.Vector3(bx-hw, floorY-flT, bz-hd), new THREE.Vector3(bx+1, floorY, bz+hd))); // bullets + LOS through the 2F slab
       // Register as platform so player can stand on it
       platforms.push({box: new THREE.Box3(new THREE.Vector3(bx-hw, 0, bz-hd), new THREE.Vector3(bx+1, floorY+0.1, bz+hd)), top: floorY, stepUp: 2.0});
       roofSlabs.push(new THREE.Box3(new THREE.Vector3(bx-hw, floorY-0.05, bz-hd), new THREE.Vector3(bx+1, floorY+0.05, bz+hd)));
@@ -314,6 +327,8 @@ function buildScene(){
       if(rfW > 0.1){
         const rf = new THREE.Mesh(new THREE.BoxGeometry(rfW, flT, bd), new THREE.MeshStandardMaterial({map:floorTex(),color:0xffffff,roughness:.92}));
         rf.position.set(bx + 3 + rfW/2, floorY - flT/2, bz); scene.add(rf);
+        wallMeshes.push(rf);
+        solidSlabs.push(new THREE.Box3(new THREE.Vector3(bx+3, floorY-flT, bz-hd), new THREE.Vector3(bx+hw, floorY, bz+hd)));
         platforms.push({box: new THREE.Box3(new THREE.Vector3(bx+3, 0, bz-hd), new THREE.Vector3(bx+hw, floorY+0.1, bz+hd)), top: floorY, stepUp: 2.0});
         roofSlabs.push(new THREE.Box3(new THREE.Vector3(bx+3, floorY-0.05, bz-hd), new THREE.Vector3(bx+hw, floorY+0.05, bz+hd)));
       }
@@ -323,6 +338,7 @@ function buildScene(){
       // Just add a slightly raised floor for visual distinction
       const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(bw, bd), new THREE.MeshStandardMaterial({map:floorTex(),color:0xffffff,roughness:.92}));
       floorMesh.rotation.x = -Math.PI/2; floorMesh.position.set(bx, 0.02, bz); scene.add(floorMesh);
+      wallMeshes.push(floorMesh);
     }
     // Ceiling — only for top floor (skip if this is floor1 and there's a floor2 above)
     if(floorY < 1.0){
@@ -333,8 +349,12 @@ function buildScene(){
       // Second floor: add ceiling + roof — register as platform so player can stand on roof
       const ceilMesh = new THREE.Mesh(new THREE.PlaneGeometry(bw, bd), ceilMatFill);
       ceilMesh.rotation.x = Math.PI/2; ceilMesh.position.set(bx, ceilY, bz); scene.add(ceilMesh);
+      wallMeshes.push(ceilMesh);
       const roofMesh = new THREE.Mesh(new THREE.PlaneGeometry(bw+0.6, bd+0.6), new THREE.MeshStandardMaterial({color:0x5a4030, roughness:0.85, side: THREE.DoubleSide}));
       roofMesh.rotation.x = -Math.PI/2; roofMesh.position.set(bx, ceilY+0.05, bz); scene.add(roofMesh);
+      wallMeshes.push(roofMesh);
+      // Ceiling/roof slab — bullets, rockets and LOS all treat it as solid
+      solidSlabs.push(new THREE.Box3(new THREE.Vector3(bx-bw/2, ceilY-0.06, bz-bd/2), new THREE.Vector3(bx+bw/2, ceilY+0.1, bz+bd/2)));
       // Register roof as platform (stepUp: jump under the ceiling to climb on top)
       platforms.push({box: new THREE.Box3(new THREE.Vector3(bx-bw/2-0.3, 0, bz-bd/2-0.3), new THREE.Vector3(bx+bw/2+0.3, ceilY+0.1, bz+bd/2+0.3)), top: ceilY+0.05, stepUp: 0.8});
       roofSlabs.push(new THREE.Box3(new THREE.Vector3(bx-bw/2-0.3, ceilY-0.07, bz-bd/2-0.3), new THREE.Vector3(bx+bw/2+0.3, ceilY+0.12, bz+bd/2+0.3)));
@@ -362,8 +382,10 @@ function buildScene(){
     dm.add(dh);
     scene.add(dg);
     let dMin, dMax;
-    if(daxis==='z'){dMin=new THREE.Vector3(dpx-DHF,0,dpz-0.07);dMax=new THREE.Vector3(dpx+DHF,DH,dpz+0.07);}
-    else {dMin=new THREE.Vector3(dpx-0.07,0,dpz-DHF);dMax=new THREE.Vector3(dpx+0.07,DH,dpz+DHF);}
+    // Y range follows the door's actual height (floorY..floorY+DH) — hardcoding 0..DH put
+    // upper-floor door colliders on the ground floor (phantom walls below, open doorways above)
+    if(daxis==='z'){dMin=new THREE.Vector3(dpx-DHF,floorY,dpz-0.07);dMax=new THREE.Vector3(dpx+DHF,floorY+DH,dpz+0.07);}
+    else {dMin=new THREE.Vector3(dpx-0.07,floorY,dpz-DHF);dMax=new THREE.Vector3(dpx+0.07,floorY+DH,dpz+DHF);}
     const dcb = new THREE.Box3(dMin, dMax);
     const dcol = dcb.clone();
     wallColliders.push(dcol);
@@ -712,6 +734,7 @@ function updateDoors(dt){
     if(Math.abs(diff) > 0.01){
       door.openAngle += diff * Math.min(1, dt*6);
       door.group.rotation.y = door.openAngle;
+      _wallRects = null; // minimap wall cache tracks world boxes — a swinging door invalidates it
     }
     // Collision is managed by toggleDoorNearPlayer + syncDoorCollision.
     // Here we only ensure visual angle matches target. No state changes.

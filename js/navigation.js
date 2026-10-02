@@ -1,9 +1,6 @@
 // ============================================================================
 // NAVIGATION — grid + A* pathfinding
 // ============================================================================
-// ============================================================================
-// NAVIGATION — grid + A* pathfinding
-// ============================================================================
 const NAV_CELL = 0.5;                 // grid cell size (world units)
 const NAV_W = 200, NAV_H = 200;       // covers the 100x100 floor (-50..50)
 const NAV_N = NAV_W * NAV_H;
@@ -59,9 +56,31 @@ function buildNavGrids(){
 // Door open/close → flip its cells in every grid
 function navSetDoor(door, isOpen){
   if(!navReady) return;
+  const db = door.collisionBox;
   for(const grid of navGrids){
     const cells = grid.doorCells.get(door);
-    if(cells) for(const idx of cells) grid.blocked[idx] = isOpen ? 0 : 1;
+    if(!cells) continue;
+    for(const idx of cells){
+      if(isOpen){
+        // Unblock — unless the cell is ALSO covered by a non-frame collider (a rock, container or
+        // neighbouring wall passing through the doorway footprint). Frame walls (the segments this
+        // doorway was cut into) keep their old behaviour: their inflated cells were always unblocked.
+        const cx = ((idx % NAV_W) + 0.5) * NAV_CELL - 50;
+        const cz = (((idx / NAV_W) | 0) + 0.5) * NAV_CELL - 50;
+        const h = NAV_CELL * 0.5;
+        let blocked = false;
+        for(const col of wallColliders){
+          if(!col || col === door.colliderRef) continue;
+          if(!(cx + h >= col.min.x - grid.inflate && cx - h <= col.max.x + grid.inflate &&
+               cz + h >= col.min.z - grid.inflate && cz - h <= col.max.z + grid.inflate)) continue;
+          const isFrame = col.max.x >= db.min.x - 0.15 && col.min.x <= db.max.x + 0.15 &&
+                          col.max.z >= db.min.z - 0.15 && col.min.z <= db.max.z + 0.15 &&
+                          col.max.y >= db.min.y - 0.15 && col.min.y <= db.max.y + 0.15;
+          if(!isFrame){ blocked = true; break; }
+        }
+        grid.blocked[idx] = blocked ? 1 : 0;
+      } else grid.blocked[idx] = 1;
+    }
   }
 }
 // Free cells again when an explosive barrel is removed

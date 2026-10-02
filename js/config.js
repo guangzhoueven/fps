@@ -57,7 +57,7 @@ const ENEMY_DEFS = {
   runner:{kind:'runner',name:'runner',hp:25,damage:8,speed:4.2,size:0.3,color:0xddaa22,scoreValue:80,attackRange:1.4,attackCooldown:0.7},
   brute:{kind:'brute',name:'brute',hp:220,damage:28,speed:1.4,size:0.7,color:0x8833aa,scoreValue:300,attackRange:2.0,attackCooldown:1.4},
   shooter:{kind:'shooter',name:'shooter',hp:45,damage:14,speed:1.8,size:0.4,color:0x22aacc,scoreValue:200,ranged:true,attackRange:18,attackCooldown:1.8},
-  boss:{kind:'boss',name:'boss',hp:1800,damage:40,speed:1.2,size:1.4,color:0x661111,scoreValue:2500,attackRange:2.6,attackCooldown:1.2,ranged:true},
+  boss:{kind:'boss',name:'boss',hp:1800,damage:40,speed:1.2,size:1.4,color:0x661111,scoreValue:2500,attackRange:14,attackCooldown:1.2,ranged:true},
   phantom:{kind:'phantom',name:'phantom',hp:35,damage:8,speed:3.8,size:0.35,color:0x88ccff,scoreValue:150,attackRange:1.3,attackCooldown:0.6},
   tank:{kind:'tank',name:'tank',hp:500,damage:50,speed:0.9,size:0.9,color:0x446644,scoreValue:600,attackRange:3.0,attackCooldown:2.0},
   bomber:{kind:'bomber',name:'bomber',hp:55,damage:30,speed:3.0,size:0.36,color:0xff7722,scoreValue:180,attackRange:1.6,attackCooldown:1.0,bomb:true},

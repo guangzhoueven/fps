@@ -146,17 +146,14 @@
     "activated": "activated!",
     "bossWave": "BOSS WAVE {0}",
     "waveIncoming": "Wave {0} incoming!",
-    "waveCleared": "Wave {0} cleared!",
+    "waveCleared": "Wave {0} cleared! +{1} coins",
     "objectiveAssign": "{0} - Reward: {1}",
     "objectiveComplete": "Objective complete! +{0}",
-    "objectiveFailed": "Objective failed",
+    "objectiveFailed": "Objective failed: {0}",
     "pickedMedkit": "Picked up Medkit",
     "pickupAmmo": "+30 ammo",
-    "pickedAmmo": "+30 ammo",
     "pickupGrenade": "+1 Grenade",
-    "pickedGrenade": "+1 Grenade",
     "pickupArmor": "+50 Armor",
-    "pickedArmor": "+50 Armor",
     "supplyCrate": "Supply crate: +2 Medkits, +30 Ammo, +2 Grenades!",
     "supplyDropped": "Supply crate dropped! Look for the golden glow!",
     "perkAcquired": "{0} acquired!",
@@ -236,7 +233,8 @@
     "semiAuto": "Semi-Auto"
   },
   "wave": {
-    "nextWave": "WAVE {0}"
+    "nextWave": "WAVE {0}",
+    "sub": "INCOMING"
   },
   "item": {
     "grenade": "Grenade",

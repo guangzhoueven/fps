@@ -85,18 +85,18 @@ function updateLightnings(dt){
     l.line.material.opacity = l.life / l.maxLife;
   }
 }
+const _tracerUp = new THREE.Vector3(0,1,0), _tracerDir = new THREE.Vector3();
 function spawnTracer(from, to){
-  // Pooled tracer mesh (grows the pool instead of allocating on overflow)
+  // Pooled tracer mesh oriented/scaled via transform — writing individual vertices
+  // of the shared cylinder used to corrupt geometry and break frustum culling.
   const mesh = acquirePooledMesh(tracerPool, _tracerGeoShared, 0xffdd66);
-  // Each pooled tracer needs its own geometry — otherwise every live tracer
-  // renders whatever endpoints were written last (shared BufferAttribute).
-  if(!mesh.userData.ownGeo){ mesh.geometry = _tracerGeoShared.clone(); mesh.userData.ownGeo = true; }
-  const positions = mesh.geometry.attributes.position;
-  if(positions){
-    positions.setXYZ(0, from.x, from.y, from.z);
-    positions.setXYZ(1, to.x, to.y, to.z);
-    positions.needsUpdate = true;
-  }
+  _tracerDir.subVectors(to, from);
+  const len = _tracerDir.length();
+  if(len < 0.01){ mesh.visible = false; return; }
+  mesh.position.copy(from).addScaledVector(_tracerDir, 0.5);
+  mesh.quaternion.setFromUnitVectors(_tracerUp, _tracerDir.normalize());
+  mesh.scale.set(1, len, 1);
+  mesh.frustumCulled = false;
   mesh.visible = true;
   tracers.push({mesh, time:0, maxTime:.08, fromPool:true});
 }
@@ -131,7 +131,7 @@ function acquireTextSprite(text, color, font, cw, ch){
     ctx.fillText(text, cw/2, ch/2);
     tex = new THREE.CanvasTexture(c);
     _textTexCache.set(key, tex);
-    if(_textTexCache.size > 384){ const oldest = _textTexCache.keys().next().value; _textTexCache.delete(oldest); }
+    if(_textTexCache.size > 384){ const oldest = _textTexCache.keys().next().value; const t = _textTexCache.get(oldest); _textTexCache.delete(oldest); if(t) t.dispose(); }
   }
   let sprite = _textSpritePool.pop();
   if(!sprite) sprite = new THREE.Sprite(new THREE.SpriteMaterial({transparent:true, depthTest:false}));

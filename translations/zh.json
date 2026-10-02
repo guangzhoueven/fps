@@ -146,17 +146,14 @@
     "activated": "已激活！",
     "bossWave": "BOSS 波次 {0}",
     "waveIncoming": "第 {0} 波来袭！",
-    "waveCleared": "第 {0} 波已清除！",
+    "waveCleared": "第 {0} 波已清除！+{1} 金币",
     "objectiveAssign": "{0} - 奖励: {1}",
     "objectiveComplete": "目标完成！+{0}",
-    "objectiveFailed": "目标失败",
+    "objectiveFailed": "目标失败：{0}",
     "pickedMedkit": "拾取医疗包",
     "pickupAmmo": "+30 弹药",
-    "pickedAmmo": "+30 弹药",
     "pickupGrenade": "+1 手雷",
-    "pickedGrenade": "+1 手雷",
     "pickupArmor": "+50 护甲",
-    "pickedArmor": "+50 护甲",
     "supplyCrate": "补给箱：+2 医疗包，+30 弹药，+2 手雷！",
     "supplyDropped": "补给箱已投下！寻找金色光芒！",
     "perkAcquired": "{0} 已获得！",
@@ -236,7 +233,8 @@
     "semiAuto": "半自动"
   },
   "wave": {
-    "nextWave": "第 {0} 波"
+    "nextWave": "第 {0} 波",
+    "sub": "来袭"
   },
   "item": {
     "grenade": "手雷",

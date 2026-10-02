@@ -129,16 +129,27 @@ const SaveGame = {
       try{
         const d = JSON.parse(reader.result);
         if(!d || typeof d !== 'object' || d.v !== 1) throw new Error('bad save');
-        if(d.lang) localStorage.setItem('gameLang', d.lang);
+        // Sanitize imported values — a hand-edited save must not inject invalid settings
+        const raw = (d.settings && typeof d.settings === 'object') ? d.settings : {};
+        const clamp = (v, lo, hi, dflt) => Number.isFinite(Number(v)) ? Math.min(hi, Math.max(lo, Number(v))) : dflt;
+        const st = {
+          sensitivity: clamp(raw.sensitivity, 0.1, 5, settings.sensitivity),
+          fov: clamp(raw.fov, 60, 110, settings.fov),
+          volume: clamp(raw.volume, 0, 1, settings.volume),
+          shadows: raw.shadows === true
+        };
+        const lang = (d.lang === 'zh' || d.lang === 'en') ? d.lang : null;
+        const diff = (d.difficulty && Object.prototype.hasOwnProperty.call(DIFFICULTIES, d.difficulty)) ? d.difficulty : null;
+        if(lang) localStorage.setItem('gameLang', lang);
         this.pendingClear = false;
         try{ sessionStorage.removeItem(PENDING_KEY); }catch(e){}
         this.write({
           v: 1, savedAt: Date.now(),
-          lang: d.lang || 'zh',
-          settings: d.settings || Object.assign({}, settings),
-          difficulty: d.difficulty || difficulty,
-          achievements: d.achievements || {},
-          run: d.run || null,
+          lang: lang || 'zh',
+          settings: st,
+          difficulty: diff || difficulty,
+          achievements: (d.achievements && typeof d.achievements === 'object') ? d.achievements : {},
+          run: (d.run && typeof d.run === 'object') ? d.run : null,
         });
         this._importing = true; // the upcoming reload's pagehide autosave must not overwrite this
         toast(I18n.t('toast.saveImported'), 'success');

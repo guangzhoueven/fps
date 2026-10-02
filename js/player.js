@@ -15,6 +15,7 @@ const _pfwd = new THREE.Vector3(), _prgt = new THREE.Vector3(), _pmove = new THR
 const _pnew = new THREE.Vector3(), _ptmp = new THREE.Vector3();
 const _pbb = new THREE.Box3(), _pbb2 = new THREE.Box3();
 const _psize = new THREE.Vector3();
+const _shakeOff = new THREE.Vector3(); // last frame's shake offset — removed before each move so shake never drifts the real position
 function playerHits(bb, checkCeiling){
   for(let i=0;i<wallColliders.length;i++){ const c = wallColliders[i]; if(c && bb.intersectsBox(c)) return true; }
   if(checkCeiling){
@@ -24,10 +25,11 @@ function playerHits(bb, checkCeiling){
 }
 function updatePlayer(dt){
   if(state.gameOver) return;
-  dt = Math.min(dt, 0.033);
+  dt = Math.min(dt, 0.05);
+  camera.position.sub(_shakeOff); _shakeOff.set(0,0,0);
   if(reviveGuard > 0) reviveGuard = Math.max(0, reviveGuard - dt);
   const sprinting = keys['ShiftLeft'] && state.stamina>0 && !crouching && (keys['KeyW']||keys['KeyA']||keys['KeyS']||keys['KeyD']);
-  crouching = !!keys['ControlLeft'];
+  crouching = !!keys['KeyC']; // C — Ctrl collides with browser shortcuts (Ctrl+W closes the tab)
   state.sprinting = sprinting; state.crouching = crouching;
   const targetEye = crouching ? crouchEye : baseEye;
   eyeHeight += (targetEye - eyeHeight) * Math.min(1, dt*12);
@@ -90,11 +92,16 @@ function updatePlayer(dt){
     }
   } else { camera.position.copy(newPos); }
   camera.rotation.y = yaw; camera.rotation.x = pitch;
-  if(shakeMag > 0.001){ camera.position.x += (Math.random()-.5)*shakeMag; camera.position.y += (Math.random()-.5)*shakeMag; camera.position.z += (Math.random()-.5)*shakeMag; shakeMag *= 0.85; }
+  if(shakeMag > 0.001){
+    _shakeOff.set((Math.random()-.5)*shakeMag, (Math.random()-.5)*shakeMag, (Math.random()-.5)*shakeMag);
+    camera.position.add(_shakeOff);
+    shakeMag *= 0.85;
+  }
 }
 function takeDamage(amount, sourcePos){
   if(state.gameOver || reviveGuard > 0 || hasPowerup('shield')) return;
   noDamageTimer = 0;
+  if(sourcePos) showDamageDirection(sourcePos);
   let remaining = amount;
   if(state.armor > 0){ const absorbed = Math.min(state.armor, amount*0.6); state.armor -= absorbed; remaining -= absorbed; }
   state.hp -= remaining; state.stats.damageTaken += amount;

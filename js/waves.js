@@ -5,6 +5,7 @@
 // WAVES
 // ============================================================================
 let waveCountdown=0, waveActive=false, supplyDropTimer=35;
+let gameTime=0; // gameplay clock — only advances while playing, so spawn timers pause with the game
 let spawnQueue=[]; // pending spawns {at,x,z,kind} — drained each frame, pauses while dead
 let currentObjective=null, waveStartHp=100, waveStartHeadshots=0, waveStartKills=0, waveGrenadeKill=false, waveBarrelKill=false;
 let excludedObjectives=[];
@@ -19,9 +20,9 @@ function startNextWave(){
   const baseCount = isBoss ? Math.floor((6+Math.floor(state.wave/5)*2)*1.8) : Math.floor((8+state.wave*3)*1.8);
   const count = Math.round(baseCount * diffCfg.spawnCountMult);
   // Clear any leftover enemies from previous wave
-  for(const e of enemies) if(e.mesh.parent) scene.remove(e.mesh);
+  for(const e of enemies) if(e.mesh.parent){ scene.remove(e.mesh); e._disposeResources(); }
   enemies = [];
-  for(const p of projectiles) scene.remove(p.mesh);
+  for(const p of projectiles){ if(p.fromPool) p.mesh.visible=false; else scene.remove(p.mesh); }
   projectiles = [];
   state.enemiesTotal = count + (isBoss?1:0);
   state.enemiesAlive = 0;
@@ -60,13 +61,13 @@ function startNextWave(){
     if(state.wave>=3) bands.push(['jumper',0.08]);   // leaps at you in bursts
     let roll=0;
     for(const [k,p] of bands){ roll+=p; if(r<roll){ kind=k; break; } }
-    spawnQueue.push({ at: clock.elapsedTime + i*0.25, sx, sz, kind });
+    spawnQueue.push({ at: gameTime + i*0.25, sx, sz, kind });
   }
 }
 // Drain due spawns — called from the animate loop while playing
 function processSpawns(){
   if(state.gameOver) return; // wait out death — remaining spawns resume after revive
-  while(spawnQueue.length && spawnQueue[0].at <= clock.elapsedTime){
+  while(spawnQueue.length && spawnQueue[0].at <= gameTime){
     const s = spawnQueue.shift();
     const e = new Enemy(s.sx, s.sz, s.kind, state.wave);
     enemies.push(e);
@@ -86,7 +87,17 @@ function processSpawns(){
   }
 }
 function spawnBoss(){
-  const boss = new Enemy(0, 14, 'boss', state.wave);
+  // Spawn in the open ring around the arena — never at a hardcoded point that may sit inside geometry
+  let boss=null;
+  for(let tries=0; tries<8; tries++){
+    const angle=Math.random()*Math.PI*2, radius=12+Math.random()*10;
+    const bx=radius*Math.cos(angle), bz=radius*Math.sin(angle);
+    const bBB=new THREE.Box3(new THREE.Vector3(bx-1.4,0,bz-1.4), new THREE.Vector3(bx+1.4,3,bz+1.4));
+    let stuck=false;
+    for(const col of wallColliders){ if(col && bBB.intersectsBox(col)){ stuck=true; break; } }
+    if(!stuck){ boss=new Enemy(bx, bz, 'boss', state.wave); break; }
+  }
+  if(!boss) boss=new Enemy(0, -16, 'boss', state.wave); // last resort — open center-south yard
   enemies.push(boss); bossRef = boss;
   state.enemiesAlive++;
   state.bossActive = true; state.bossHp = boss.hp; state.bossMaxHp = boss.maxHp; state.bossName = boss.def.name;
@@ -114,8 +125,8 @@ function completeWave(){
   // Remove leftover enemy meshes (safety)
   for(const e of enemies){ if(!e.alive && e.mesh.parent) scene.remove(e.mesh); }
   enemies = enemies.filter(e => e.alive);
-  // Clear projectiles
-  for(const p of projectiles) scene.remove(p.mesh);
+  // Clear projectiles (pooled ones return to the pool — leaving them visible would hide them from acquire)
+  for(const p of projectiles){ if(p.fromPool) p.mesh.visible=false; else scene.remove(p.mesh); }
   projectiles = [];
   evaluateObjective();
   if(window.SaveGame) SaveGame.autoSave();

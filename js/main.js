@@ -99,6 +99,9 @@ function animate(){
   const time = clock.elapsedTime;
   updateDynamicSky(dt);
   if(phase === 'playing' && !state.gameOver){
+    // Overlay (shop/perks) open: freeze input so WASD/reload/grenade don't fire behind it
+    if(uiOverlayOpen()){ for(const k in keys) keys[k] = false; mouseDown = false; adsActive = false; }
+    gameTime += dt;
     if(waveCountdown > 0){
       waveCountdown -= dt; state.waveCountdown = Math.max(0, waveCountdown);
       showWaveAnnouncement();
@@ -128,8 +131,8 @@ function animate(){
     updatePlayer(dt);
     // ADS FOV lerp
     const sel = state.inventory[state.selectedSlot];
-    const zoomW = WEAPONS[sel?.type]?.zoom || BASE_FOV;
-    const targetFOV = adsActive ? zoomW : BASE_FOV;
+    const zoomW = WEAPONS[sel?.type]?.zoom || settings.fov || BASE_FOV;
+    const targetFOV = adsActive ? zoomW : (settings.fov || BASE_FOV);
     currentFOV += (targetFOV - currentFOV) * Math.min(1, dt * 10);
     camera.fov = currentFOV;
     camera.updateProjectionMatrix();
@@ -145,7 +148,7 @@ function animate(){
     if(bossRef && bossRef.alive) state.bossHp = bossRef.hp;
     _hudFrame++;
     // Time-based throttles — frame-modulo gets more expensive on high-Hz displays
-    if(time - _lastHudT >= 0.05){ _lastHudT = time; updateHUD(); } // ~20Hz
+    if(time - _lastHudT >= 0.05){ _lastHudT = time; updateHUD(); updateCrosshairStyle(); } // ~20Hz
     if(time - _lastMmT >= 0.066){ _lastMmT = time; drawMinimap(); } // ~15Hz
   } else if(phase === 'menu'){
     updateCrosshairStyle();
@@ -171,6 +174,12 @@ if(_newGameBtn) _newGameBtn.addEventListener('click', e=>{ e.stopPropagation(); 
 
 function startGame(resume){
   audio.init(); audio.resume();
+  // Apply persisted settings — they are saved/imported even though there is no settings UI
+  if(audio.master && typeof settings.volume === 'number') audio.master.gain.value = settings.volume;
+  if(renderer && renderer.shadowMap && !!renderer.shadowMap.enabled !== !!settings.shadows){
+    renderer.shadowMap.enabled = !!settings.shadows;
+    scene.traverse(o=>{ if(o.material){ const mats = Array.isArray(o.material) ? o.material : [o.material]; for(const m of mats) m.needsUpdate = true; } });
+  }
   if(phase === 'menu' || state.gameOver){
     // New game after a soft-clear → this is when the data is really deleted
     if(!resume && window.SaveGame) SaveGame.purge();
@@ -220,15 +229,16 @@ function startGame(resume){
       door.group.rotation.y = door.targetAngle;
       syncDoorCollision(door);
     }
-    // Clear entities
-    for(const e of enemies) scene.remove(e.mesh); enemies = [];
-    for(const g of grenades) scene.remove(g.mesh); grenades = [];
+    // Clear entities (pooled meshes go back to their pools — hiding, not removing,
+    // otherwise acquirePooledMesh can never hand them out again)
+    for(const e of enemies){ scene.remove(e.mesh); e._disposeResources(); } enemies = [];
+    for(const g of grenades){ scene.remove(g.mesh); if(g.trail){ scene.remove(g.trail); g.trail.geometry.dispose(); g.trail.material.dispose(); } } grenades = [];
     for(const p of pickups) scene.remove(p.mesh); pickups = [];
-    for(const p of particles) scene.remove(p.mesh); particles = [];
-    for(const t of tracers) scene.remove(t.mesh); tracers = [];
+    for(const p of particles){ if(p.fromPool) p.mesh.visible=false; else scene.remove(p.mesh); } particles = [];
+    for(const t of tracers){ if(t.fromPool) t.mesh.visible=false; else scene.remove(t.mesh); } tracers = [];
     for(const ex of explosions) scene.remove(ex.mesh); explosions = [];
-    for(const sp of scorePopups) scene.remove(sp.mesh); scorePopups = [];
-    for(const pr of projectiles) scene.remove(pr.mesh); projectiles = [];
+    for(const sp of scorePopups){ scene.remove(sp.mesh); if(sp.pooled){ sp.mesh.visible=false; _textSpritePool.push(sp.mesh); } } scorePopups = [];
+    for(const pr of projectiles){ if(pr.fromPool) pr.mesh.visible=false; else scene.remove(pr.mesh); } projectiles = [];
     bossRef = null;
     camera.position.set(0, 1.6, 0); yaw = 0; pitch = 0;
     rebuildInventory();
@@ -291,7 +301,7 @@ window.addEventListener('langchange', function() {
   if(state.inShop) showShop();
   if(document.getElementById('perks') && document.getElementById('perks').style.display === 'flex') showPerkSelection();
   if(state.waveCountdown > 0) showWaveAnnouncement();
-  if(wpStatsVisible) toggleWeaponStatsPanel();
+  if(wpStatsVisible){ wpStatsVisible = false; toggleWeaponStatsPanel(); } // force re-render in the new language (a plain toggle would hide it)
 });
 
 // ============================================================================

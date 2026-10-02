@@ -83,15 +83,14 @@ function detonateGrenade(g){
   const flashLight = new THREE.PointLight(0xff8800, 15, 20, 1.5);
   flashLight.position.copy(pos); scene.add(flashLight);
   setTimeout(()=>{ if(flashLight.parent) scene.remove(flashLight); }, 300);
-  // Damage enemies
-  for(const en of enemies){
+  // Damage enemies (snapshot — a kill can spawn splitter children mid-loop)
+  for(const en of enemies.slice()){
     if(en.alive && pos.distanceTo(en.mesh.position) < 5.5){
       let dmg = 100; if(hasPowerup('damage')) dmg *= 2;
-      const wasAlive = en.alive; en.takeDamage(dmg, false);
-      if(wasAlive && !en.alive) waveGrenadeKill = true;
+      if(en.takeDamage(dmg, false)) waveGrenadeKill = true; // takeDamage returns true on the killing blow
     }
   }
-  if(pos.distanceTo(camera.position) < 4.5) takeDamage(35, pos);
+  if(pos.distanceTo(camera.position) < 4.5 && !blastLOSBlocked(pos, camera.position)) takeDamage(35, pos);
   audio.explosion(); addShake(0.8);
   // Lots of sparks for visual impact
   for(let i=0;i<15;i++) spawnSpark(pos.clone(), i%3===0?0xffff00:i%3===1?0xff6600:0xff3300, 0.15+Math.random()*0.15);
@@ -107,11 +106,9 @@ function detonateBarrel(b){
   expMesh.position.copy(pos); scene.add(expMesh);
   explosions.push({mesh:expMesh, time:0, maxTime:.6});
   const radius = 4.5;
-  for(const en of enemies){
+  for(const en of enemies.slice()){ // snapshot — chain kills must not run over freshly split children
     if(en.alive && pos.distanceTo(en.mesh.position) < radius){
-      const wasAlive = en.alive;
-      en.takeDamage(120 * damageMult, false);
-      if(wasAlive && !en.alive) { waveBarrelKill = true; state.waveBarrelKills++; }
+      if(en.takeDamage(120 * damageMult, false)){ waveBarrelKill = true; state.waveBarrelKills++; }
     }
   }
   for(const other of explosiveBarrels){
@@ -119,7 +116,7 @@ function detonateBarrel(b){
       setTimeout(()=>detonateBarrel(other), 80);
     }
   }
-  if(pos.distanceTo(camera.position) < 3.5) takeDamage(30, pos);
+  if(pos.distanceTo(camera.position) < 3.5 && !blastLOSBlocked(pos, camera.position)) takeDamage(30, pos);
   audio.explosion(); addShake(0.6);
   for(let i=0;i<15;i++) spawnSpark(pos.clone(), i%2?0xff4400:0xffaa00, 0.1+Math.random()*0.1);
 }
@@ -131,8 +128,8 @@ let activePowerups = [];
 function hasPowerup(id){ return activePowerups.some(p=>p.id===id); }
 function activatePowerup(id, label, icon, duration){
   const existing = activePowerups.find(p=>p.id===id);
-  if(existing) existing.remaining = Math.max(existing.remaining, duration);
-  else activePowerups.push({id, label, icon, remaining: duration});
+  if(existing){ existing.remaining = Math.max(existing.remaining, duration); existing.duration = Math.max(existing.duration || 0, duration); }
+  else activePowerups.push({id, label, icon, remaining: duration, duration});
   audio.powerup(); toast(I18n.t('powerup.'+id) + ' ' + I18n.t('toast.activated'), 'success');
 }
 function updatePowerups(dt){
@@ -153,6 +150,7 @@ const _swAxes = ['x','y','z'];
 const _swOut = {hit:false, t:1, point:new THREE.Vector3(), contact:new THREE.Vector3(), normal:new THREE.Vector3()};
 const _gPrev = new THREE.Vector3(), _gNext = new THREE.Vector3();
 const _prjPrev = new THREE.Vector3(), _prjNext = new THREE.Vector3();
+const _grSeg = new THREE.Vector3(), _grCen = new THREE.Vector3(), _grP = new THREE.Vector3();
 
 function segBoxEntryT(box, a, b, pad){
   let tmin = 0, tmax = 1;
@@ -167,7 +165,14 @@ function segBoxEntryT(box, a, b, pad){
     if(t2 < tmax) tmax = t2;
     if(tmin > tmax) return -1;
   }
-  return tmin;
+    return tmin;
+}
+
+// True if a wall/floor sits between an explosion and the player — blast damage must not punch through cover
+function blastLOSBlocked(from, to){
+  for(let i=0;i<wallColliders.length;i++){ const c = wallColliders[i]; if(c && segBoxEntryT(c, from, to, 0) >= 0) return true; }
+  for(let i=0;i<solidSlabs.length;i++){ const s = solidSlabs[i]; if(s && segBoxEntryT(s, from, to, 0) >= 0) return true; }
+  return false;
 }
 
 // Returns the first surface hit along from->to (pad = projectile radius).
@@ -217,6 +222,26 @@ function updateGrenades(dt){
     g.vel.y -= (g.isRocket ? 2 : 9.8) * dt;
     _gNext.copy(_gPrev).addScaledVector(g.vel, dt);
     const hit = sweepProjectiles(_gPrev, _gNext, g.isRocket ? 0.15 : 0.22);
+    // Rockets/bolts detonate on enemy contact instead of flying through flesh
+    if(g.isRocket){
+      let eT = Infinity, eEn = null;
+      _grSeg.subVectors(_gNext, _gPrev);
+      const l2 = _grSeg.lengthSq();
+      for(const en of enemies){
+        if(!en.alive || en.dying) continue;
+        const r = en.size + 0.18;
+        _grCen.subVectors(en.mesh.position, _gPrev);
+        let t = l2 > 1e-9 ? _grCen.dot(_grSeg)/l2 : 0;
+        t = t < 0 ? 0 : (t > 1 ? 1 : t);
+        _grP.copy(_gPrev).addScaledVector(_grSeg, t);
+        if(t < eT && _grP.distanceToSquared(en.mesh.position) <= r*r){ eT = t; eEn = en; }
+      }
+      if(eEn && (!hit.hit || eT <= hit.t)){
+        g.mesh.position.copy(_gPrev).lerp(_gNext, eT);
+        g._pos.copy(g.mesh.position);
+        detonateGrenade(g); continue;
+      }
+    }
     if(hit.hit){
       g.mesh.position.copy(g.isRocket ? hit.contact : hit.point);
       g._pos.copy(g.mesh.position);

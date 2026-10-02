@@ -55,6 +55,7 @@ class Enemy {
     this.wanderTarget = {x:x+(Math.random()-.5)*10, z:z+(Math.random()-.5)*10};
     this.lastSeenPos = null;
     this.attackCooldown = 0;
+    this._alertTimer = 0;
     this._losFrame = 0;
     // A* navigation — pick the nav grid matching this enemy's footprint
     const footprint = this.def.size * 0.9;
@@ -97,7 +98,7 @@ class Enemy {
       this.mesh.position.y = Math.max(0, this.mesh.position.y);
       this.mesh.rotation.x += this.dyingRotSpeed.x*dt; 
       this.mesh.rotation.z += this.dyingRotSpeed.z*dt; 
-      if(this.dyingTimer <= 0) { this.alive = false; scene.remove(this.mesh); }
+      if(this.dyingTimer <= 0){ this.alive = false; scene.remove(this.mesh); this._disposeResources(); }
       return;
     }
     // Hit flash restore (replaces one setTimeout per bullet hit)
@@ -291,7 +292,7 @@ class Enemy {
   }
   losBlocked(from, to){
     _losDir.subVectors(to, from);
-    const len = Math.min(_losDir.length(), 18); if(len < 1e-4) return false;
+    const len = Math.min(_losDir.length(), 22); if(len < 1e-4) return false; // match vision range (22) — clipping at 18 granted sight THROUGH walls 18-22m away
     _losDir.normalize();
     _losRC.set(from, _losDir, 0, len);
     if(_losRC.intersectObjects(wallMeshes, false).length > 0) return true;
@@ -311,11 +312,12 @@ class Enemy {
     this._burnT = Math.max(this._burnT || 0, dur);
   }
   takeDamage(dmg, headshot){
-    if(!this.alive || this.dying) return;
+    if(!this.alive || this.dying) return false;
     this.hp -= dmg;
     const mat = this.mesh.material;
     if(mat.emissive && !this._flashing){ this._flashing = true; this._flashTimer = 0.06; mat.emissive.setHex(0xffffff); }
-    if(this.hp <= 0) this.die(headshot);
+    if(this.hp <= 0){ this.die(headshot); return true; }
+    return false;
   }
   die(headshot){
     if(!this.alive || this.dying) return; // dying — never re-enter (tank explosion used to recurse infinitely)
@@ -330,9 +332,7 @@ class Enemy {
     else if(killStreakCount >= 8 && lastKillStreakAnnounced < 3){ lastKillStreakAnnounced = 3; showKillStreak(I18n.t('killstreak.unstoppable')); }
     else if(killStreakCount >= 5 && lastKillStreakAnnounced < 2){ lastKillStreakAnnounced = 2; showKillStreak(I18n.t('killstreak.rampage')); }
     else if(killStreakCount >= 3 && lastKillStreakAnnounced < 1){ lastKillStreakAnnounced = 1; showKillStreak(I18n.t('killstreak.tripleKill')); }
-    if(headshot) state.stats.headshots++;
-    // Track wave headshots for achievement
-    state.waveHeadshots++;
+    if(headshot){ state.stats.headshots++; state.waveHeadshots++; } // wave headshots feed the headhunter achievement — count real headshots only
     state.combo++; state.comboTimer = 4.0 * (1 + comboBoost);
     if(state.combo > state.stats.bestCombo) state.stats.bestCombo = state.combo;
     const comboMult = 1 + Math.min(state.combo-1, 9) * 0.1;
@@ -342,6 +342,7 @@ class Enemy {
     state.credits += Math.round(this.def.scoreValue * 0.3);
     spawnScorePopup(this.mesh.position.clone(), headshot?`+${gained} HS`:`+${gained}`, headshot?'#fbbf24':'#ff8844');
     spawnBlood(this.mesh.position, this.def.color, this.def.size);
+    addKillFeed(headshot ? I18n.t('enemy.'+this.def.kind) + ' · HS' : I18n.t('enemy.'+this.def.kind), this.def.kind === 'boss' ? '💀' : '☠');
     const dropRoll = Math.random();
     // Tank explosion on death
     if(this.def.kind === 'tank'){
@@ -355,9 +356,9 @@ class Enemy {
       const flashLight = new THREE.PointLight(0xff8800,20,25,1.5); flashLight.position.copy(pos); scene.add(flashLight);
       setTimeout(()=>{ if(flashLight.parent) scene.remove(flashLight); }, 400);
       const radius = 4.5;
-      for(const en of enemies){ if(en !== this && en.alive && !en.dying && pos.distanceTo(en.mesh.position) < radius){ en.takeDamage(80 * damageMult, false); } }
+      for(const en of enemies.slice()){ if(en !== this && en.alive && !en.dying && pos.distanceTo(en.mesh.position) < radius){ en.takeDamage(80 * damageMult, false); } } // snapshot: chain kills skip newborn split children
       for(const other of explosiveBarrels){ if(!other.exploded && pos.distanceTo(other.pos) < radius){ setTimeout(()=>detonateBarrel(other), 80); } }
-      if(pos.distanceTo(camera.position) < 3.5){ takeDamage(40, pos); }
+      if(pos.distanceTo(camera.position) < 3.5 && !blastLOSBlocked(pos, camera.position)){ takeDamage(40, pos); }
       audio.explosion(); addShake(1.0);
       for(let i=0;i<15;i++) spawnSpark(pos.clone(), i%3===0?0xffff00:i%3===1?0xff6600:0xff3300, 0.18+Math.random()*0.18);
     }
@@ -376,10 +377,10 @@ class Enemy {
       const bRadius = 4;
       // Scale with enemy HP so bombers chain-kill each other at any difficulty
       const bDmg = 120 * (DIFFICULTIES[difficulty]?.enemyHpMult || 1);
-      for(const en of enemies){ if(en !== this && en.alive && !en.dying && pos.distanceTo(en.mesh.position) < bRadius){ en.takeDamage(bDmg, false); } }
+      for(const en of enemies.slice()){ if(en !== this && en.alive && !en.dying && pos.distanceTo(en.mesh.position) < bRadius){ en.takeDamage(bDmg, false); } } // snapshot: chain kills skip newborn split children
       for(const other of explosiveBarrels){ if(!other.exploded && pos.distanceTo(other.pos) < bRadius){ setTimeout(()=>detonateBarrel(other), 60); } }
       const bDist = pos.distanceTo(camera.position);
-      if(bDist < bRadius) takeDamage(Math.max(8, Math.round(55 * (1 - bDist/bRadius*0.55))), pos);
+      if(bDist < bRadius && !blastLOSBlocked(pos, camera.position)) takeDamage(Math.max(8, Math.round(55 * (1 - bDist/bRadius*0.55))), pos);
       audio.explosion(); addShake(0.7);
       for(let i=0;i<12;i++) spawnSpark(pos.clone(), i%2?0xff8800:0xffcc44, 0.14+Math.random()*0.14);
     }
@@ -421,6 +422,15 @@ class Enemy {
     }
     // Only complete wave when all enemies have spawned AND all are dead
     if(state.enemiesAlive <= 0 && spawnQueue.length === 0 && enemies.filter(e=>e.alive && !e.dying).length === 0 && waveActive) completeWave();
+  }
+  // Free GPU resources — every enemy owns its geometry/materials/HP-bar texture,
+  // so a long session that never reloaded the page used to grow without bound
+  _disposeResources(){
+    const m = this.mesh;
+    m.traverse(o=>{ if(o.isMesh && o.geometry) o.geometry.dispose(); });
+    if(m.material){ if(m.material.map) m.material.map.dispose(); m.material.dispose(); }
+    const bs = this.barSprite;
+    if(bs && bs.material){ if(bs.material.map) bs.material.map.dispose(); bs.material.dispose(); this.barSprite = null; }
   }
   updateHpBar(){
     if(!this.barCtx || !this.barSprite) return;

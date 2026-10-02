@@ -24,17 +24,20 @@ function toastAction(msg, btnLabel, cb, variant='info'){
 // Minimap
 const mmCanvas = document.getElementById('minimap');
 const mmCtx = mmCanvas ? mmCanvas.getContext('2d') : null;
-const _MM_COLORS = {boss:'#ff2222', brute:'#aa44cc', shooter:'#22aacc', runner:'#ddaa22', bomber:'#ff7722', splitter:'#66bb44', healer:'#55eebb', jumper:'#ff55aa', swarmling:'#aaee44'};
+const _MM_COLORS = {boss:'#ff2222', brute:'#aa44cc', shooter:'#22aacc', runner:'#ddaa22', bomber:'#ff7722', splitter:'#66bb44', healer:'#55eebb', jumper:'#ff55aa', swarmling:'#aaee44', phantom:'#88ccff', tank:'#446644', grunt:'#cc3333'};
 const _MM_DEFAULT_COLOR = '#cc3333';
 // Wall rects in world space — rebuilt only when wallMeshes changes
 let _wallRects = null;
 function _getWallRects(){
   if(_wallRects && _wallRects.length === wallMeshes.length) return _wallRects;
   const rects = [];
+  const bb = new THREE.Box3();
   for(const w of wallMeshes){
-    if(!w.geometry.boundingBox) w.geometry.computeBoundingBox();
-    const bb = w.geometry.boundingBox; if(!bb) continue;
-    rects.push({x:(bb.min.x+bb.max.x)/2, z:(bb.min.z+bb.max.z)/2, w:bb.max.x-bb.min.x, h:bb.max.z-bb.min.z});
+    bb.setFromObject(w); // WORLD-space box — geometry.boundingBox is local, which stacked every rect at the map origin
+    if(bb.isEmpty()) continue;
+    const rw = bb.max.x-bb.min.x, rh = bb.max.z-bb.min.z;
+    if(rw > 60 || rh > 60) continue; // the 100×100 ground plane is a bullet target, not a wall
+    rects.push({x:(bb.min.x+bb.max.x)/2, z:(bb.min.z+bb.max.z)/2, w:rw, h:rh});
   }
   _wallRects = rects;
   return rects;
@@ -118,7 +121,7 @@ function invLabel(s){
 function invalidateHudCache(){ _hbSig=''; _ammoSig=''; _objSig=''; _puSig=''; }
 function updateHUD(){
   // Sync powerup snapshot here (every HUD tick) instead of every frame
-  state.powerups = activePowerups.map(p=>({id:p.id, label:p.label, icon:p.icon, remaining:p.remaining}));
+  state.powerups = activePowerups.map(p=>({id:p.id, label:p.label, icon:p.icon, remaining:p.remaining, duration:p.duration}));
   // Stats
   HUD['s-score'].textContent = state.score.toLocaleString();
   HUD['s-credits'].textContent = state.credits;
@@ -227,7 +230,7 @@ function updateHUD(){
     state.powerups.forEach(p=>{
       const div = document.createElement('div'); div.className = 'pu';
       div.style.borderColor = p.id==='speed'?'#44ddff':p.id==='damage'?'#ff4422':p.id==='rapid'?'#ffaa00':'#ffee88';
-      div.innerHTML = `<span class="picon">${p.icon}</span><span>${I18n.t('powerup.'+p.id)}</span><span class="ptimer"><span class="ptimer-fill" style="width:${Math.max(0,p.remaining/12)*100}%;background:${div.style.borderColor}"></span></span>`;
+      div.innerHTML = `<span class="picon">${p.icon}</span><span>${I18n.t('powerup.'+p.id)}</span><span class="ptimer"><span class="ptimer-fill" style="width:${Math.max(0, p.remaining/(p.duration||12))*100}%;background:${div.style.borderColor}"></span></span>`;
       puEl.appendChild(div);
     });
   }
