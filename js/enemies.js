@@ -10,6 +10,7 @@ let bossKills = 0;
 // Scratch objects for hot per-enemy paths (avoid per-frame allocations)
 const _losDir = new THREE.Vector3();
 const _losTarget = new THREE.Vector3();
+const _losEnd = new THREE.Vector3();
 const _losRC = new THREE.Raycaster();
 const _mvBox = new THREE.Box3();
 const _burnOff = new THREE.Vector3();
@@ -131,7 +132,7 @@ class Enemy {
     this._losTimer = (this._losTimer || 0) - dt;
     if(this._losTimer <= 0){
       this._losTimer = 0.12 + Math.random()*0.1;
-      _losTarget.set(px, 1.6, pz);
+      _losTarget.set(px, camera.position.y, pz); // real eye height — 1.6 let roof-top players be "seen" through the ceiling
       this._losBlockedCached = this.losBlocked(this.mesh.position, _losTarget);
     }
     const hasLOS = !this._losBlockedCached;
@@ -290,9 +291,19 @@ class Enemy {
   }
   losBlocked(from, to){
     _losDir.subVectors(to, from);
-    const len = Math.min(_losDir.length(), 18); _losDir.normalize();
+    const len = Math.min(_losDir.length(), 18); if(len < 1e-4) return false;
+    _losDir.normalize();
     _losRC.set(from, _losDir, 0, len);
-    return _losRC.intersectObjects(wallMeshes, false).length > 0;
+    if(_losRC.intersectObjects(wallMeshes, false).length > 0) return true;
+    // Floors/ceilings/roofs live in solidSlabs (Box3s, not meshes) — without this a
+    // ground enemy could see and hit a player standing on the roof above it
+    _losEnd.copy(from).addScaledVector(_losDir, len);
+    for(let i=0;i<solidSlabs.length;i++){
+      const s = solidSlabs[i];
+      if(!s) continue;
+      if(segBoxEntryT(s, from, _losEnd, 0) >= 0) return true;
+    }
+    return false;
   }
   applyBurn(dps, dur){
     if(!this.alive || this.dying) return;
