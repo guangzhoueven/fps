@@ -33,11 +33,14 @@ canvas{display:block}
 #crosshair.cr-smg::after{left:50%;top:4px;height:28px;width:1px;transform:translateX(-50%)}
 #crosshair.cr-shotgun{background:rgba(255,255,255,.15);border-radius:50%;width:40px;height:40px;transition:width .1s,height .1s}
 #crosshair.cr-shotgun::before,#crosshair.cr-shotgun::after{display:none}
-#crosshair.cr-rifle::before,#crosshair.cr-rifle::after{background:rgba(255,200,100,.8);width:calc(100% - 4px);height:1px}
+#crosshair.cr-rifle::before{background:rgba(255,200,100,.8);width:calc(100% - 4px);height:1px;left:50%;top:50%;transform:translate(-50%,-50%)}
+#crosshair.cr-rifle::after{background:rgba(255,200,100,.8);width:1px;height:calc(100% - 4px);left:50%;top:50%;transform:translate(-50%,-50%)}
 #crosshair.cr-sniper{background:rgba(255,0,0,.15);border-radius:50%;width:24px;height:24px}
-#crosshair.cr-sniper::before,#crosshair.cr-sniper::after{background:rgba(255,50,50,.9);width:calc(100% + 2px)}
+#crosshair.cr-sniper::before{background:rgba(255,50,50,.9);width:calc(100% + 2px);height:2px;left:50%;top:50%;transform:translate(-50%,-50%)}
+#crosshair.cr-sniper::after{background:rgba(255,50,50,.9);width:2px;height:calc(100% + 2px);left:50%;top:50%;transform:translate(-50%,-50%)}
 #crosshair.cr-grenade{width:42px;height:42px;border:2px dashed rgba(255,100,30,.6);border-radius:50%;background:rgba(255,80,20,.08)}
-#crosshair.cr-grenade::before,#crosshair.cr-grenade::after{background:rgba(255,120,40,.5);width:calc(100% - 8px);height:1px}
+#crosshair.cr-grenade::before{background:rgba(255,120,40,.5);width:calc(100% - 8px);height:1px;left:50%;top:50%;transform:translate(-50%,-50%)}
+#crosshair.cr-grenade::after{background:rgba(255,120,40,.5);width:1px;height:calc(100% - 8px);left:50%;top:50%;transform:translate(-50%,-50%)}
 #crosshair.cr-grenade.ads{width:32px;height:32px;border-width:1px}
 #crosshair.cr-medkit{width:38px;height:38px;background:rgba(74,222,128,.12);border-radius:50%;border:2px solid rgba(74,222,128,.4)}
 #crosshair.cr-medkit::before,#crosshair.cr-medkit::after{background:rgba(74,222,128,.6)}
