@@ -1,14 +1,14 @@
 {
   "name": "neon-siege",
   "productName": "NeonSiege",
-  "version": "1.0.0",
+  "version": "2.1.3",
   "description": "NEON SIEGE - Wave Survival FPS",
   "author": "NeonSiege",
   "private": true,
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder --win --publish never"
+    "dist": "node scripts/set-version.js && electron-builder --win --publish never"
   },
   "devDependencies": {
     "electron": "^33.2.0",
