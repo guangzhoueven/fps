@@ -91,6 +91,8 @@ let fireCooldown=0, reloadTimeout=null, reloadStartTime=0, reloadDuration=0;
 // Persistent raycast target list — refreshed once per shot instead of per pellet
 let _fireTargets = [];
 const _fireRC = new THREE.Raycaster();
+const _hitN = new THREE.Vector3();   // hit face normal in WORLD space (face.normal is local — ground is rotated)
+const _upN = new THREE.Vector3(0, 1, 0);
 
 function fireWeapon(){
   const sel = state.inventory[state.selectedSlot];
@@ -161,7 +163,7 @@ function fireRay(w){
       if(barrel){ detonateBarrel(barrel); break; }
     }
     spawnSpark(hit.point, 0xffcc66, 0.1);
-    spawnDecal(hit.point, hit.face?.normal || new THREE.Vector3(0,1,0));
+    spawnDecal(hit.point, hit.face ? _hitN.copy(hit.face.normal).transformDirection(hit.object.matrixWorld) : _upN);
     break;
   }
   if(!endPoint) endPoint = _fireRC.ray.origin.clone().add(_fireRC.ray.direction.clone().multiplyScalar(w.range));
@@ -231,7 +233,7 @@ function fireRayBounce(w, ndc){
       if(barrel){ detonateBarrel(barrel); endPoint = hit.point.clone(); break; }
     }
     spawnSpark(hit.point, 0xaaddff, 0.1);
-    spawnDecal(hit.point, hit.face?.normal || new THREE.Vector3(0,1,0));
+    spawnDecal(hit.point, hit.face ? _hitN.copy(hit.face.normal).transformDirection(hit.object.matrixWorld) : _upN);
     if(bounces >= w.bounce || !hit.face){ endPoint = hit.point.clone(); break; }
     // Reflect the ray about the surface normal in world space
     _bounceNM.getNormalMatrix(hit.object.matrixWorld);
