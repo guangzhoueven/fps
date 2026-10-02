@@ -98,6 +98,7 @@ function detonateGrenade(g){
 }
 function detonateBarrel(b){
   if(b.exploded) return; b.exploded = true; scene.remove(b.mesh);
+  if(b.lid) scene.remove(b.lid); // lid is a scene sibling — remove it too, or it floats in place
   // Remove its collision + free the nav cells it occupied
   if(b.collider){ const ci = wallColliders.indexOf(b.collider); if(ci >= 0) wallColliders.splice(ci, 1); navUnblockBox(b.collider); }
   const wi = wallMeshes.indexOf(b.mesh); if(wi >= 0) wallMeshes.splice(wi, 1);

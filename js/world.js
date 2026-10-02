@@ -480,7 +480,7 @@ function buildScene(){
       const bCol = new THREE.Box3().setFromObject(barrel);
       wallColliders.push(bCol);
       wallMeshes.push(barrel);
-      explosiveBarrels.push({mesh:barrel, pos:new THREE.Vector3(pp.x,0.5,pp.z), exploded:false, collider:bCol});
+      explosiveBarrels.push({mesh:barrel, lid, pos:new THREE.Vector3(pp.x,0.5,pp.z), exploded:false, collider:bCol});
     } else if(roll < 0.7){
       // Normal barrel
       const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,0.95,12), barrelMat);
