@@ -46,7 +46,7 @@ canvas{display:block}
 #crosshair.cr-medkit::before,#crosshair.cr-medkit::after{background:rgba(74,222,128,.6)}
 
 /* Hit marker */
-#hitmarker{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:51;opacity:0}
+#hitmarker{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:71;opacity:0}
 #hitmarker .hl{position:absolute;width:10px;height:2px;background:#fff;transform-origin:center}
 #hitmarker.hit{animation:hm-pop .15s ease-out}
 #hitmarker.hs{animation:hm-crit .2s ease-out}
@@ -62,7 +62,7 @@ canvas{display:block}
 @keyframes hm-kill{0%{opacity:0;transform:translate(-50%,-50%) scale(.1)}30%{opacity:1;transform:translate(-50%,-50%) scale(1.5)}100%{opacity:0;transform:translate(-50%,-50%) scale(.8)}}
 
 /* Kill badge pop */
-#kill-badge{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);font-size:clamp(1.2rem,4vw,2.5rem);font-weight:900;color:#fff;text-shadow:0 0 12px rgba(255,80,20,.8);pointer-events:none;z-index:52;opacity:0;white-space:nowrap}
+#kill-badge{position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);font-size:clamp(1.2rem,4vw,2.5rem);font-weight:900;color:#fff;text-shadow:0 0 12px rgba(255,80,20,.8);pointer-events:none;z-index:70;opacity:0;white-space:nowrap}
 #kill-badge.show{animation:kb-pop .8s ease-out forwards}
 @keyframes kb-pop{0%{opacity:0;transform:translate(-50%,-50%) scale(.3) translateY(0)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.1) translateY(-20px)}40%{transform:translate(-50%,-50%) scale(1) translateY(-30px)}100%{opacity:0;transform:translate(-50%,-50%) scale(.8) translateY(-60px)}}
 
@@ -70,6 +70,20 @@ canvas{display:block}
 #dmg-dir{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;pointer-events:none;z-index:42;border-radius:50%}
 .dmg-arc{position:absolute;width:100%;height:100%;clip-path:polygon(50% 50%, 60% 0%, 40% 0%);background:rgba(255,30,30,.5);animation:dmg-fade .5s forwards}
 @keyframes dmg-fade{from{opacity:.8}to{opacity:0}}
+
+/* Sniper scope overlay — full-screen black mask with a round lens */
+#scope-overlay{position:fixed;inset:0;z-index:60;display:none;pointer-events:none}
+.scope-lens{position:absolute;left:50%;top:50%;width:min(70vh,70vw);height:min(70vh,70vw);transform:translate(-50%,-50%);border-radius:50%;
+  box-shadow:0 0 0 200vmax rgba(0,0,0,.78), inset 0 0 0 9px #060608, inset 0 0 0 12px #2b2e34, inset 0 0 44px 16px rgba(0,0,0,.6);
+  transition:box-shadow .2s}
+#scope-overlay.holding .scope-lens{box-shadow:0 0 0 200vmax rgba(0,0,0,.78), inset 0 0 0 9px #060608, inset 0 0 0 12px #3fa8e0, inset 0 0 44px 16px rgba(0,0,0,.55), 0 0 18px 2px rgba(63,168,224,.35)}
+.scope-lens::after{content:'';position:absolute;inset:12px;border-radius:50%;background:radial-gradient(circle at 34% 28%, rgba(140,200,255,.12), rgba(140,200,255,.02) 46%, rgba(0,0,0,.22) 100%)}
+.scope-cross-h{position:absolute;left:7%;right:7%;top:50%;height:1.5px;transform:translateY(-50%);background:rgba(6,6,8,.92);box-shadow:0 0 1.5px rgba(255,255,255,.3)}
+.scope-cross-v{position:absolute;top:7%;bottom:7%;left:50%;width:1.5px;transform:translateX(-50%);background:rgba(6,6,8,.92);box-shadow:0 0 1.5px rgba(255,255,255,.3)}
+.scope-dot{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2.5px 0 0 -2.5px;border-radius:50%;background:#060608;
+  box-shadow:0 0 0 1px rgba(255,255,255,.35)}
+.scope-glare{position:absolute;inset:12px;border-radius:50%;background:linear-gradient(115deg, transparent 28%, rgba(255,255,255,.10) 42%, transparent 56%);pointer-events:none}
+.scope-zoom{position:absolute;bottom:15%;left:50%;transform:translateX(-50%);font:700 13px/1 ui-monospace,Consolas,monospace;color:rgba(150,215,255,.8);letter-spacing:3px;text-shadow:0 0 8px rgba(70,170,255,.5)}
 
 /* Compass-style minimap border */
 #minimap{border:2px solid rgba(249,115,22,.4)!important;box-shadow:0 0 12px rgba(249,115,22,.15)!important}
@@ -218,7 +232,7 @@ canvas{display:block}
 #perks .skip{margin-top:20px;padding:8px 20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:2px;background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:8px;cursor:pointer}
 
 /* Damage overlay */
-#dmg-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:41;display:none;border:0 solid rgba(255,0,0,0);transition:border .1s}
+#dmg-overlay{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:65;display:none;border:0 solid rgba(255,0,0,0);transition:border .1s}
 
 /* Powerups (left-center) */
 #powerups{position:absolute;top:50%;left:16px;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px}

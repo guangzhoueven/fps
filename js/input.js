@@ -32,12 +32,14 @@ addEventListener('mousedown', e=>{
 addEventListener('mouseup', e=>{ if(e.button===0) mouseDown=false; if(e.button===2) adsActive = false; });
 addEventListener('mousemove', e=>{
   if(document.pointerLockElement !== canvas) return;
-  const sens = settings.sensitivity * 0.0022;
+  const sens = settings.sensitivity * 0.0022 * (isScoped() ? SCOPE_SENS[scopeZoomIdx] : 1);
   yaw -= e.movementX * sens; pitch -= e.movementY * sens;
   pitch = Math.max(-Math.PI/2+0.1, Math.min(Math.PI/2-0.1, pitch));
   mouseDeltaX += e.movementX; mouseDeltaY += e.movementY;
 });
-addEventListener('wheel', e=>{ if(document.pointerLockElement!==canvas) return; e.preventDefault(); selectSlot(state.selectedSlot + (e.deltaY>0?1:-1)); }, {passive:false});
+addEventListener('wheel', e=>{ if(document.pointerLockElement!==canvas) return; e.preventDefault();
+  if(isScoped()){ const n = SCOPE_ZOOMS.length; scopeZoomIdx = ((scopeZoomIdx + (e.deltaY>0?1:-1)) % n + n) % n; }
+  else selectSlot(state.selectedSlot + (e.deltaY>0?1:-1)); }, {passive:false});
 addEventListener('contextmenu', e=>e.preventDefault());
 addEventListener('resize', ()=>{ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 

@@ -35,6 +35,7 @@ function pauseGame(){
   if(phase !== 'playing') return;
   setPhase('paused');
   mouseDown = false; adsActive = false;
+  updateScope(0);
   for(const k in keys) keys[k] = false;
   if(document.pointerLockElement === canvas) document.exitPointerLock();
   document.getElementById('pause-menu').style.display = 'flex';
@@ -129,10 +130,11 @@ function animate(){
       }
     }
     updatePlayer(dt);
+    updateScope(dt);
     // ADS FOV lerp
     const sel = state.inventory[state.selectedSlot];
     const zoomW = WEAPONS[sel?.type]?.zoom || settings.fov || BASE_FOV;
-    const targetFOV = adsActive ? zoomW : (settings.fov || BASE_FOV);
+    const targetFOV = adsActive ? (isScoped() ? fovForZoom(SCOPE_ZOOMS[scopeZoomIdx]) : zoomW) : (settings.fov || BASE_FOV);
     currentFOV += (targetFOV - currentFOV) * Math.min(1, dt * 10);
     camera.fov = currentFOV;
     camera.updateProjectionMatrix();

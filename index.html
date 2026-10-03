@@ -143,10 +143,19 @@
 
 <div id="toasts"></div>
 <input type="file" id="save-file-input" accept=".json,application/json" style="display:none">
-<div id="streak-msg" style="position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);font-size:clamp(2rem,8vw,4rem);font-weight:900;text-transform:uppercase;color:#f97316;text-shadow:0 0 30px rgba(249,115,22,.8),0 0 60px rgba(249,115,22,.4);opacity:0;pointer-events:none;z-index:60;transition:opacity 0.2s;"></div>
+<div id="streak-msg" style="position:fixed;top:38%;left:50%;transform:translate(-50%,-50%);font-size:clamp(2rem,8vw,4rem);font-weight:900;text-transform:uppercase;color:#f97316;text-shadow:0 0 30px rgba(249,115,22,.8),0 0 60px rgba(249,115,22,.4);opacity:0;pointer-events:none;z-index:72;transition:opacity 0.2s;"></div>
 <div id="dmg-overlay"></div>
 <div id="dmg-dir"></div>
 <div id="vignette"></div>
+<div id="scope-overlay">
+  <div class="scope-lens">
+    <div class="scope-cross-h"></div>
+    <div class="scope-cross-v"></div>
+    <div class="scope-dot"></div>
+    <div class="scope-glare"></div>
+    <div class="scope-zoom" id="scope-zoom">×4</div>
+  </div>
+</div>
 <div id="boss-intro">
   <div class="bi-w">⚠ <span data-i18n="boss.warning">警告</span> ⚠</div>
   <div class="bi-t" data-i18n="boss.title">BOSS</div>

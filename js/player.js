@@ -28,13 +28,13 @@ function updatePlayer(dt){
   dt = Math.min(dt, 0.05);
   camera.position.sub(_shakeOff); _shakeOff.set(0,0,0);
   if(reviveGuard > 0) reviveGuard = Math.max(0, reviveGuard - dt);
-  const sprinting = keys['ShiftLeft'] && state.stamina>0 && !crouching && (keys['KeyW']||keys['KeyA']||keys['KeyS']||keys['KeyD']);
+  const sprinting = keys['ShiftLeft'] && state.stamina>0 && !crouching && !isScoped() && (keys['KeyW']||keys['KeyA']||keys['KeyS']||keys['KeyD']);
   crouching = !!keys['KeyC']; // C — Ctrl collides with browser shortcuts (Ctrl+W closes the tab)
   state.sprinting = sprinting; state.crouching = crouching;
   const targetEye = crouching ? crouchEye : baseEye;
   eyeHeight += (targetEye - eyeHeight) * Math.min(1, dt*12);
   const speedBoost = hasPowerup('speed') ? 1.5 : 1;
-  const baseSpeed = (crouching?2.2:sprinting?8:5) * speedBoost * moveSpeedMult;
+  const baseSpeed = (crouching?2.2:sprinting?8:5) * speedBoost * moveSpeedMult * (isScoped() ? 0.55 : 1);
   if(sprinting) state.stamina = Math.max(0, state.stamina - dt*25);
   else state.stamina = Math.min(state.maxStamina, state.stamina + dt*15);
   _pfwd.set(-Math.sin(yaw),0,-Math.cos(yaw));
@@ -145,7 +145,7 @@ function showDamageDirection(fromPos){
   setTimeout(()=>{ el.innerHTML = ''; }, 600);
 }
 
-function triggerGameOver(){ state.gameOver = true; if(window.SaveGame) SaveGame.clearRun(); document.exitPointerLock(); showGameOver(); }
+function triggerGameOver(){ state.gameOver = true; adsActive = false; updateScope(0); if(window.SaveGame) SaveGame.clearRun(); document.exitPointerLock(); showGameOver(); }
 function revivePlayer(){
   if(!state.gameOver) return;
   state.gameOver = false;
@@ -161,3 +161,38 @@ function revivePlayer(){
   toast(I18n.t('toast.revived'), 'success');
 }
 function addShake(mag){ shakeMag = Math.max(shakeMag, mag); }
+
+// ============================================================================
+// SNIPER SCOPE — full-screen overlay, magnification, breathing sway
+// ============================================================================
+let _scopeEl = null, _scopeZoomEl = null, _scopeSwayT = 0, _scopeBreath = false;
+function updateScope(dt){
+  if(!_scopeEl){
+    _scopeEl = document.getElementById('scope-overlay');
+    _scopeZoomEl = document.getElementById('scope-zoom');
+  }
+  if(!_scopeEl) return;
+  if(!isScoped()){
+    _scopeEl.style.display = 'none';
+    _scopeEl.classList.remove('holding');
+    _scopeBreath = false; _scopeSwayT = 0;
+    if(weaponGroup && !weaponGroup.visible) weaponGroup.visible = true;
+    return;
+  }
+  _scopeEl.style.display = 'block';
+  if(_scopeZoomEl) _scopeZoomEl.textContent = '×' + SCOPE_ZOOMS[scopeZoomIdx];
+  weaponGroup.visible = false;
+  // Breath hold — Shift while scoped: starts above 20 stamina, drains (net -15/s vs regen)
+  if(_scopeBreath){
+    if(!keys['ShiftLeft'] || state.stamina <= 0) _scopeBreath = false;
+    else state.stamina = Math.max(0, state.stamina - dt * 30);
+  } else if(keys['ShiftLeft'] && state.stamina > 20) _scopeBreath = true;
+  _scopeEl.classList.toggle('holding', _scopeBreath);
+  // Lens sway — slow figure-8 drift, doubled while moving, silenced by breath hold
+  _scopeSwayT += dt;
+  const moving = keys['KeyW']||keys['KeyA']||keys['KeyS']||keys['KeyD'];
+  const amp = (_scopeBreath ? 0 : 1) * (moving ? 2.1 : 1) * 0.0042;
+  camera.rotation.y += (Math.sin(_scopeSwayT*1.15)*0.6 + Math.sin(_scopeSwayT*2.4+1.3)*0.4) * amp;
+  camera.rotation.x += (Math.cos(_scopeSwayT*0.95)*0.55 + Math.sin(_scopeSwayT*2.05+0.6)*0.45) * amp * 0.8;
+  camera.updateMatrixWorld();
+}

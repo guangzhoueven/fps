@@ -38,6 +38,19 @@ let adsActive = false;
 let currentFOV = 75;
 const BASE_FOV = 75;
 
+// Sniper scope — magnification levels and per-level mouse sensitivity factor
+const SCOPE_ZOOMS = [4, 8, 16];
+const SCOPE_SENS = [0.5, 0.35, 0.22];
+let scopeZoomIdx = 0;
+function isScoped(){
+  const sel = state.inventory[state.selectedSlot];
+  return adsActive && !!sel && sel.type === 'sniper';
+}
+function fovForZoom(z){
+  const base = (settings.fov || BASE_FOV) * Math.PI / 180;
+  return 2 * Math.atan(Math.tan(base / 2) / z) * 180 / Math.PI;
+}
+
 const WEAPONS = {
   pistol:{id:'pistol',name:'pistol',icon:'🔫',damage:22,magSize:12,reserveMax:96,fireRate:0.28,reloadTime:1.0,spread:0.008,pellets:1,auto:false,range:60,recoil:0.012,price:0,color:0x4a4a4a},
   smg:{id:'smg',name:'smg',icon:'🔫',damage:16,magSize:30,reserveMax:240,fireRate:0.07,reloadTime:1.4,spread:0.025,pellets:1,auto:true,range:50,recoil:0.008,price:600,color:0x2a2a2a},
