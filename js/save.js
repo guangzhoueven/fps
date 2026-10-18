@@ -166,6 +166,9 @@ const SaveGame = {
     const show = !!run && !this.pendingClear;
     el.style.display = show ? '' : 'none';
     if(show) el.textContent = I18n.tf('menu.continue', run.resumeWave || 1);
+    // No save on this machine → offer an import link on the start page instead
+    const imp = document.getElementById('btn-import-save');
+    if(imp) imp.style.display = show ? 'none' : '';
   },
 
   init(){
@@ -182,6 +185,8 @@ const SaveGame = {
     const bind = (id, fn) => { const el = document.getElementById(id); if(el) el.addEventListener('click', fn); };
     bind('pm-export', ()=>this.exportData());
     bind('pm-import', ()=>this.importData());
+    // The start-page import link lives inside #blocker (click → startGame) — keep it out
+    bind('btn-import-save', e=>{ if(e && e.stopPropagation) e.stopPropagation(); this.importData(); });
     bind('pm-clear', ()=>this.clearAll());
     bind('confirm-cancel', ()=>this.closeConfirm());
     bind('confirm-ok', ()=>this.confirmClear());
