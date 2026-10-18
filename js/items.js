@@ -85,10 +85,14 @@ function detonateGrenade(g){
   setTimeout(()=>{ if(flashLight.parent) scene.remove(flashLight); }, 300);
   // Damage enemies (snapshot — a kill can spawn splitter children mid-loop)
   for(const en of enemies.slice()){
-    if(en.alive && pos.distanceTo(en.mesh.position) < 5.5){
-      let dmg = 100; if(hasPowerup('damage')) dmg *= 2;
-      if(en.takeDamage(dmg, false)) waveGrenadeKill = true; // takeDamage returns true on the killing blow
-    }
+    if(!en.alive) continue;
+    const d = pos.distanceTo(en.mesh.position);
+    if(d >= 5.5) continue;
+    // Rockets hit far harder than grenades, with falloff from the blast center
+    let dmg = (g.isRocket ? 600 : 100) * damageMult;
+    if(hasPowerup('damage')) dmg *= 2;
+    if(g.isRocket) dmg *= 1 - (d / 5.5) * 0.45;
+    if(en.takeDamage(dmg, false)) waveGrenadeKill = true; // takeDamage returns true on the killing blow
   }
   if(pos.distanceTo(camera.position) < 4.5 && !blastLOSBlocked(pos, camera.position)) takeDamage(35, pos);
   audio.explosion(); addShake(0.8);
