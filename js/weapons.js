@@ -308,8 +308,11 @@ function updateWeaponAnim(dt){
   swayY += (mouseDeltaY*0.0008 - swayY) * Math.min(1, dt*8);
   mouseDeltaX *= 0.85; mouseDeltaY *= 0.85;
   // ADS: move weapon to center, reduce sway
+  const _selW = state.inventory[state.selectedSlot];
+  const _wDef = _selW ? WEAPONS[_selW.type] : null;
+  // The crossbow's upright bow arm pokes above the muzzle — drop the whole weapon lower in ADS so it clears the crosshair
   const adsTargetX = adsActive ? 0 : 0.26;
-  const adsTargetY = adsActive ? -0.18 : -0.22;
+  const adsTargetY = adsActive ? (_wDef && _wDef.id === 'crossbow' ? -0.27 : -0.18) : -0.22;
   const adsTargetZ = adsActive ? -0.4 : -0.5;
   const adsFactor = adsActive ? 0.18 : 0.08;
   originalWeaponPosX += (adsTargetX - originalWeaponPosX) * Math.min(1, dt*10);
